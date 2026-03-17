@@ -177,19 +177,34 @@ function buildOverdue(students) {
   return rows
 }
 
-function buildGroups(students, milestoneId) {
+function buildGroups(students, milestoneId, milestoneGroups) {
+  // milestoneGroups: array from milestone_groups table for this milestoneId
+  const groupMap = {}
+  for (const g of (milestoneGroups || [])) {
+    groupMap[g.group_name] = g
+  }
+  const milestoneName = MILESTONES.find(m => m.id === milestoneId)?.name || milestoneId
+
   const rows = []
   for (const s of students) {
     const sm = (s.student_milestones || []).find(x => x.milestone_id === milestoneId)
-    const rd = sm?.response_data || {}
+    const groupName = sm?.group_name || ''
+    const groupInfo = groupMap[groupName] || {}
+    // Format coordinator-set date nicely
+    const groupDate = groupInfo.date
+      ? new Date(groupInfo.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+      : ''
     rows.push({
       'Reg No':     s.student_id || '',
       'Name':       s.name,
       'Email':      s.email,
       'Supervisor': s.supervisors?.name || '',
-      'Group':      sm?.group_name || 'Not assigned',
-      'Date':       rd.defense_date || rd.date || '',
-      'Time':       rd.defense_time || rd.time_slot || '',
+      'Milestone':  milestoneName,
+      'Group':      groupName || 'Not assigned',
+      'Date':       groupDate,
+      'Time':       groupInfo.time_slot || '',
+      'Capacity':   groupInfo.capacity ? `${groupInfo.capacity} students` : '',
+      'Notes':      groupInfo.notes || '',
       'Status':     sm?.status ? sm.status.charAt(0).toUpperCase() + sm.status.slice(1) : 'Pending',
     })
   }
@@ -260,19 +275,37 @@ export default function Reports() {
   const [selectedStudent, setSelectedStudent] = useState('')
   const [generating, setGenerating]           = useState(false)
 
+  const [milestoneGroupsData, setMilestoneGroupsData] = useState({})
+
   useEffect(() => {
-    getStudentsWithProgress().then(data => {
-      setStudents(data)
-      if (data.length) setSelectedStudent(data[0].id)
+    async function loadAll() {
+      const students = await getStudentsWithProgress()
+      setStudents(students)
+      if (students.length) setSelectedStudent(students[0].id)
+
+      // Load group dates/times from milestone_groups table
+      const { supabase } = await import('../lib/supabase')
+      const { data: grps } = await supabase
+        .from('milestone_groups')
+        .select('*')
+        .order('group_name')
+
+      const grouped = {}
+      for (const g of (grps || [])) {
+        if (!grouped[g.milestone_id]) grouped[g.milestone_id] = []
+        grouped[g.milestone_id].push(g)
+      }
+      setMilestoneGroupsData(grouped)
       setLoading(false)
-    })
+    }
+    loadAll()
   }, [])
 
   function getRows() {
     switch (reportType) {
       case 'full_progress':    return buildFullProgress(students)
       case 'overdue':          return buildOverdue(students)
-      case 'groups':           return buildGroups(students, groupMilestone)
+      case 'groups':           return buildGroups(students, groupMilestone, milestoneGroupsData[groupMilestone])
       case 'milestone_status': return buildMilestoneStatus(students, milestoneFilter)
       case 'individual': {
         const s = students.find(x => x.id === selectedStudent)
@@ -286,7 +319,7 @@ export default function Reports() {
     switch (reportType) {
       case 'full_progress':    return 'Full Student Progress Report'
       case 'overdue':          return 'Overdue Students Report'
-      case 'groups':           return `Group Assignments — ${GROUP_MILESTONE_LIST.find(m => m.id === groupMilestone)?.name}`
+      case 'groups':           return `Group Assignments — ${MILESTONES.find(m => m.id === groupMilestone)?.name || GROUP_MILESTONE_LIST.find(m => m.id === groupMilestone)?.name}`
       case 'milestone_status': return `${MILESTONES.find(m => m.id === milestoneFilter)?.name} — All Students`
       case 'individual':       return `Student Report — ${students.find(s => s.id === selectedStudent)?.name || ''}`
       default: return 'Report'
