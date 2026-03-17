@@ -54,7 +54,7 @@ export default function Respond() {
 
         // Validate token
         const { data: s, error } = await supabase
-          .from('students').select('id, name, email').eq('token', token).single()
+          .from('students').select('id, name, email, token').eq('token', token).single()
         if (error || !s) throw new Error('Invalid or expired link.')
         setStudent(s)
 
@@ -196,17 +196,15 @@ export default function Respond() {
           .join('\n')
       }
 
-      // Send confirmation email using shared emailService
-      try {
-        await sendStudentEmail({
+      // Send confirmation email — fire and forget, never block the success screen
+      setTimeout(() => {
+        sendStudentEmail({
           student,
-          milestoneId,
+          milestoneId: null, // no response link needed in confirmation
           subject:  `Confirmation: ${milestoneName} — Thesis Coordination`,
-          message:  `Your submission for "${milestoneName}" has been confirmed.\n\n${confirmationDetails}\n\nIf you have any questions, please contact your thesis coordinator.\n\nDr Salma Elnour\nThesis Coordinator`,
-        })
-      } catch(emailErr) {
-        console.warn('Confirmation email failed:', emailErr)
-      }
+          message:  `Dear ${student.name},\n\nYour submission for "${milestoneName}" has been received and confirmed.\n\n${confirmationDetails}\n\nIf you have any questions, please contact your thesis coordinator.\n\nBest regards,\nDr Salma Elnour\nThesis Coordinator`,
+        }).catch(e => console.warn('Confirmation email failed silently:', e))
+      }, 500)
 
       setGroupInfo(groupInfo)
       setStage('success')
