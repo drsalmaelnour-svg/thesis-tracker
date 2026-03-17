@@ -20,64 +20,76 @@ const GROUP_MILESTONES = [
   { id: 'progress_2',       name: 'Second Progress Report' },
 ]
 
+// Initialize a blank group form
+function blankGroup(milestoneId, groupName) {
+  return { milestone_id: milestoneId, group_name: groupName, date: '', time_slot: '', capacity: 15, notes: '' }
+}
+
 function GroupManagement() {
-  const [groups, setGroups]     = useState({})
-  const [loading, setLoading]   = useState(true)
-  const [saving, setSaving]     = useState('')
-  const [saved, setSaved]       = useState('')
-
-  async function loadGroups() {
-    const result = {}
+  // formState: { proposal_defense: { A: {...}, B: {...} }, progress_1: {...}, progress_2: {...} }
+  const [formState, setFormState] = useState(() => {
+    const s = {}
     for (const m of GROUP_MILESTONES) {
-      const { data } = await supabase
-        .from('milestone_groups')
-        .select('*')
-        .eq('milestone_id', m.id)
-        .order('group_name')
-      result[m.id] = data || []
+      s[m.id] = { A: blankGroup(m.id, 'A'), B: blankGroup(m.id, 'B') }
     }
-    setGroups(result)
-    setLoading(false)
-  }
+    return s
+  })
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving]   = useState('')
+  const [savedId, setSavedId] = useState('')
+  const [errors, setErrors]   = useState({})
 
-  useEffect(() => { loadGroups() }, [])
+  useEffect(() => {
+    async function load() {
+      const next = {}
+      for (const m of GROUP_MILESTONES) {
+        const { data } = await supabase
+          .from('milestone_groups').select('*')
+          .eq('milestone_id', m.id).order('group_name')
+        const rows = data || []
+        next[m.id] = {
+          A: rows.find(r => r.group_name === 'A') || blankGroup(m.id, 'A'),
+          B: rows.find(r => r.group_name === 'B') || blankGroup(m.id, 'B'),
+        }
+      }
+      setFormState(next)
+      setLoading(false)
+    }
+    load()
+  }, [])
 
-  function getGroup(milestoneId, groupName) {
-    return (groups[milestoneId] || []).find(g => g.group_name === groupName) || {}
-  }
-
-  function setGroupField(milestoneId, groupName, field, value) {
-    setGroups(prev => {
-      const list = [...(prev[milestoneId] || [])]
-      const idx  = list.findIndex(g => g.group_name === groupName)
-      if (idx >= 0) list[idx] = { ...list[idx], [field]: value }
-      else list.push({ milestone_id: milestoneId, group_name: groupName, [field]: value })
-      return { ...prev, [milestoneId]: list }
-    })
+  function setField(milestoneId, groupName, field, value) {
+    setFormState(prev => ({
+      ...prev,
+      [milestoneId]: {
+        ...prev[milestoneId],
+        [groupName]: { ...prev[milestoneId][groupName], [field]: value }
+      }
+    }))
   }
 
   async function saveGroups(milestoneId) {
     setSaving(milestoneId)
-    const list = groups[milestoneId] || []
-    for (const g of list) {
-      await supabase.from('milestone_groups').upsert(
-        { milestone_id: milestoneId, group_name: g.group_name, date: g.date || null, time_slot: g.time_slot || null, capacity: parseInt(g.capacity) || 15, notes: g.notes || '' },
-        { onConflict: 'milestone_id,group_name' }
-      )
-    }
-    // Make sure both A and B exist
-    for (const gn of ['A', 'B']) {
-      if (!list.find(g => g.group_name === gn)) {
-        await supabase.from('milestone_groups').upsert(
-          { milestone_id: milestoneId, group_name: gn, capacity: 15 },
-          { onConflict: 'milestone_id,group_name' }
-        )
+    setErrors(e => ({ ...e, [milestoneId]: '' }))
+    try {
+      for (const groupName of ['A', 'B']) {
+        const g = formState[milestoneId][groupName]
+        const { error } = await supabase.from('milestone_groups').upsert({
+          milestone_id: milestoneId,
+          group_name:   groupName,
+          date:         g.date      || null,
+          time_slot:    g.time_slot || null,
+          capacity:     parseInt(g.capacity) || 15,
+          notes:        g.notes     || '',
+        }, { onConflict: 'milestone_id,group_name' })
+        if (error) throw error
       }
+      setSavedId(milestoneId)
+      setTimeout(() => setSavedId(''), 3000)
+    } catch(e) {
+      setErrors(prev => ({ ...prev, [milestoneId]: e.message || 'Save failed' }))
     }
     setSaving('')
-    setSaved(milestoneId)
-    setTimeout(() => setSaved(''), 3000)
-    loadGroups()
   }
 
   return (
@@ -87,7 +99,7 @@ function GroupManagement() {
       </h2>
       <p className="text-xs text-navy-400 mb-5">
         Set dates and capacity for Group A and Group B for each milestone.
-        Students will see available groups and cannot select a full one.
+        Students cannot select a full group.
       </p>
 
       {loading ? (
@@ -98,16 +110,16 @@ function GroupManagement() {
             <div key={m.id} className="border border-navy-700/40 rounded-2xl p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-medium text-slate-200">{m.name}</h3>
-                {saved === m.id && (
+                {savedId === m.id && (
                   <span className="text-xs text-emerald-400 flex items-center gap-1">
-                    <CheckCircle2 size={12} /> Saved
+                    <CheckCircle2 size={12} /> Saved successfully
                   </span>
                 )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 {['A', 'B'].map(gn => {
-                  const g = getGroup(m.id, gn)
+                  const g = formState[m.id][gn]
                   return (
                     <div key={gn} className="bg-navy-800/40 rounded-xl p-4 space-y-3">
                       <p className="font-semibold text-gold-400">Group {gn}</p>
@@ -115,30 +127,34 @@ function GroupManagement() {
                         <label className="block text-xs text-navy-400 mb-1">Date</label>
                         <input type="date" className="input"
                           value={g.date || ''}
-                          onChange={e => setGroupField(m.id, gn, 'date', e.target.value)} />
+                          onChange={e => setField(m.id, gn, 'date', e.target.value)} />
                       </div>
                       <div>
                         <label className="block text-xs text-navy-400 mb-1">Time</label>
                         <input type="text" className="input" placeholder="e.g. 10:00 AM"
                           value={g.time_slot || ''}
-                          onChange={e => setGroupField(m.id, gn, 'time_slot', e.target.value)} />
+                          onChange={e => setField(m.id, gn, 'time_slot', e.target.value)} />
                       </div>
                       <div>
-                        <label className="block text-xs text-navy-400 mb-1">Capacity</label>
+                        <label className="block text-xs text-navy-400 mb-1">Capacity (max students)</label>
                         <input type="number" className="input" min="1" max="50"
                           value={g.capacity || 15}
-                          onChange={e => setGroupField(m.id, gn, 'capacity', e.target.value)} />
+                          onChange={e => setField(m.id, gn, 'capacity', e.target.value)} />
                       </div>
                       <div>
                         <label className="block text-xs text-navy-400 mb-1">Notes (optional)</label>
-                        <input type="text" className="input" placeholder="e.g. Room 301"
+                        <input type="text" className="input" placeholder="e.g. Room 301, Building A"
                           value={g.notes || ''}
-                          onChange={e => setGroupField(m.id, gn, 'notes', e.target.value)} />
+                          onChange={e => setField(m.id, gn, 'notes', e.target.value)} />
                       </div>
                     </div>
                   )
                 })}
               </div>
+
+              {errors[m.id] && (
+                <p className="text-xs text-red-400 mt-3">⚠ {errors[m.id]}</p>
+              )}
 
               <button
                 onClick={() => saveGroups(m.id)}
@@ -146,7 +162,7 @@ function GroupManagement() {
                 className="btn-primary mt-4 disabled:opacity-50"
               >
                 {saving === m.id ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                {saving === m.id ? 'Saving…' : 'Save Groups'}
+                {saving === m.id ? 'Saving…' : `Save ${m.name} Groups`}
               </button>
             </div>
           ))}
