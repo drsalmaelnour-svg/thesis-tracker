@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import emailjs from '@emailjs/browser'
 import { useSearchParams } from 'react-router-dom'
+import { sendStudentEmail } from '../lib/emailService'
 import { CheckCircle2, XCircle, Loader2, GraduationCap, Send, Users, Calendar, Clock } from 'lucide-react'
 import { MILESTONES } from '../lib/supabase'
 
@@ -196,25 +196,15 @@ export default function Respond() {
           .join('\n')
       }
 
-      // Send confirmation via EmailJS (static import)
+      // Send confirmation email using shared emailService
       try {
-        const PUBLIC_KEY  = import.meta.env.VITE_EMAILJS_PUBLIC_KEY
-        const SERVICE_ID  = import.meta.env.VITE_EMAILJS_SERVICE_ID
-        const TEMPLATE_ID = import.meta.env.VITE_EMAILJS_STUDENT_TEMPLATE
-
-        if (PUBLIC_KEY && SERVICE_ID && TEMPLATE_ID) {
-          emailjs.init(PUBLIC_KEY)
-          await emailjs.send(SERVICE_ID, TEMPLATE_ID, {
-            to_email:      student.email,
-            to_name:       student.name,
-            subject:       `Confirmation: ${milestoneName} — Thesis Coordination`,
-            message:       `Your submission for "${milestoneName}" has been confirmed.\n\n${confirmationDetails}\n\nIf you have any questions, please contact your thesis coordinator.`,
-            response_link: '',
-            milestone:     milestoneName,
-          })
-        }
+        await sendStudentEmail({
+          student,
+          milestoneId,
+          subject:  `Confirmation: ${milestoneName} — Thesis Coordination`,
+          message:  `Your submission for "${milestoneName}" has been confirmed.\n\n${confirmationDetails}\n\nIf you have any questions, please contact your thesis coordinator.\n\nDr Salma Elnour\nThesis Coordinator`,
+        })
       } catch(emailErr) {
-        // Don't block success if email fails
         console.warn('Confirmation email failed:', emailErr)
       }
 
