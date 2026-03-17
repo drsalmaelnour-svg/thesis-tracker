@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { UserPlus, Search, Mail, ArrowRight, Filter } from 'lucide-react'
+import { UserPlus, Search, Mail, ArrowRight, Upload } from 'lucide-react'
 import { getStudentsWithProgress, MILESTONES } from '../lib/supabase'
 import { MilestoneBar } from '../components/MilestoneProgress'
 import AddStudentModal from '../components/AddStudentModal'
 import EmailModal from '../components/EmailModal'
+import ImportModal from '../components/ImportModal'
 
 const STATUS_LABELS = {
   all: 'All Students',
@@ -19,6 +20,7 @@ export default function Students() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
   const [showAdd, setShowAdd] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [emailStudent, setEmailStudent] = useState(null)
 
   async function load() {
@@ -40,7 +42,7 @@ export default function Students() {
       filter === 'all' ? true :
       filter === 'overdue' ? milestones.some(m => m.status === 'overdue') :
       filter === 'complete' ? milestones.filter(m => m.status === 'completed').length === MILESTONES.length :
-      filter === 'on_track' ? !milestones.some(m => m.status === 'overdue') : true
+      filter === 'on_track' ? !milestones.some(m => m.status === 'overdue')
 
     return matchesSearch && matchesFilter
   })
@@ -53,9 +55,14 @@ export default function Students() {
           <h1 className="font-display text-3xl font-semibold text-slate-100">Students</h1>
           <p className="text-navy-400 mt-1">{students.length} enrolled students</p>
         </div>
-        <button onClick={() => setShowAdd(true)} className="btn-primary">
-          <UserPlus size={15} /> Add Student
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowImport(true)} className="btn-secondary">
+            <Upload size={15} /> Import CSV
+          </button>
+          <button onClick={() => setShowAdd(true)} className="btn-primary">
+            <UserPlus size={15} /> Add Student
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -186,6 +193,7 @@ export default function Students() {
       </div>
 
       {showAdd && <AddStudentModal onClose={() => setShowAdd(false)} onSuccess={load} />}
+      {showImport && <ImportModal onClose={() => setShowImport(false)} onSuccess={load} />}
       {emailStudent && <EmailModal student={emailStudent} onClose={() => setEmailStudent(null)} />}
     </div>
   )
