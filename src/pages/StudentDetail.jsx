@@ -120,7 +120,23 @@ export default function StudentDetail() {
                       {sm?.completed_at && (
                         <p className="text-xs text-navy-400">Completed {new Date(sm.completed_at).toLocaleDateString()}</p>
                       )}
-                      {sm?.notes && <p className="text-xs text-navy-400 truncate">{sm.notes}</p>}
+                      {sm?.group_name && (
+                        <span className="inline-flex items-center gap-1 text-xs bg-gold-500/15 text-gold-300 border border-gold-500/25 px-2 py-0.5 rounded-lg mt-1">
+                          Group {sm.group_name}
+                        </span>
+                      )}
+                      {sm?.response_data && Object.keys(sm.response_data).length > 0 ? (
+                        <div className="mt-1.5 space-y-0.5">
+                          {Object.entries(sm.response_data).filter(([k,v]) => v && k !== 'group').map(([key, val]) => (
+                            <p key={key} className="text-xs">
+                              <span className="text-navy-400 capitalize">{key.replace(/_/g, ' ')}: </span>
+                              <span className="text-emerald-300 font-medium">{val}</span>
+                            </p>
+                          ))}
+                        </div>
+                      ) : sm?.notes ? (
+                        <p className="text-xs text-navy-400 truncate">{sm.notes}</p>
+                      ) : null}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {/* Reminder button for pending milestones */}
