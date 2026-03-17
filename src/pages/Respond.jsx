@@ -35,6 +35,7 @@ export default function Respond() {
   const [formData, setFormData]     = useState({})
   const [fieldErrors, setFieldErrors] = useState({})
   const [selectedGroup, setSelectedGroup] = useState(null)
+  const [groupInfo, setGroupInfo] = useState(null)
 
   const milestone   = MILESTONES.find(m => m.id === milestoneId)
   const needsGroups = GROUP_MILESTONES.includes(milestoneId)
@@ -150,6 +151,7 @@ export default function Respond() {
       const notes = Object.entries(data).filter(([,v]) => v)
         .map(([k,v]) => `${k.replace(/_/g,' ')}: ${v}`).join(' | ')
 
+      // Save milestone completion
       await supabase.from('student_milestones').upsert({
         student_id:    student.id,
         milestone_id:  milestoneId,
@@ -161,6 +163,62 @@ export default function Respond() {
         updated_at:    new Date().toISOString(),
       }, { onConflict: 'student_id,milestone_id' })
 
+      // Fetch group details if this is a group milestone
+      let groupInfo = null
+      if (selectedGroup) {
+        const { data: grp } = await supabase
+          .from('milestone_groups')
+          .select('*')
+          .eq('milestone_id', milestoneId)
+          .eq('group_name', selectedGroup)
+          .single()
+        groupInfo = grp
+      }
+
+      // Build confirmation email content
+      const milestoneName = MILESTONES.find(m => m.id === milestoneId)?.name || milestoneId
+      const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : ''
+
+      let confirmationDetails = ''
+      if (groupInfo) {
+        confirmationDetails = [
+          `Group: ${selectedGroup}`,
+          groupInfo.date    ? `Date: ${formatDate(groupInfo.date)}`   : '',
+          groupInfo.time_slot ? `Time: ${groupInfo.time_slot}`        : '',
+          groupInfo.notes   ? `Location: ${groupInfo.notes}`          : '',
+        ].filter(Boolean).join('\n')
+      } else {
+        // For non-group milestones show submitted fields
+        confirmationDetails = Object.entries(data)
+          .filter(([,v]) => v)
+          .map(([k,v]) => `${k.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase())}: ${v}`)
+          .join('\n')
+      }
+
+      // Send confirmation via EmailJS
+      try {
+        const emailjs = await import('@emailjs/browser')
+        const PUBLIC_KEY  = import.meta.env.VITE_EMAILJS_PUBLIC_KEY
+        const SERVICE_ID  = import.meta.env.VITE_EMAILJS_SERVICE_ID
+        const TEMPLATE_ID = import.meta.env.VITE_EMAILJS_STUDENT_TEMPLATE
+
+        if (PUBLIC_KEY && SERVICE_ID && TEMPLATE_ID) {
+          emailjs.default.init(PUBLIC_KEY)
+          await emailjs.default.send(SERVICE_ID, TEMPLATE_ID, {
+            to_email:      student.email,
+            to_name:       student.name,
+            subject:       `Confirmation: ${milestoneName} — Thesis Coordination`,
+            message:       `Your submission for "${milestoneName}" has been confirmed.\n\n${confirmationDetails}\n\nIf you have any questions, please contact your thesis coordinator.`,
+            response_link: '',
+            milestone:     milestoneName,
+          })
+        }
+      } catch(emailErr) {
+        // Don't block success if email fails
+        console.warn('Confirmation email failed:', emailErr)
+      }
+
+      setGroupInfo(groupInfo)
       setStage('success')
     } catch(e) {
       setErrorMsg('Failed to save. Please try again or contact your coordinator.')
@@ -415,6 +473,34 @@ export default function Respond() {
                     <p className="text-3xl mb-2">{milestone.icon}</p>
                     <p className="text-emerald-300 font-semibold">{milestone.name}</p>
                     {selectedGroup && <p className="text-emerald-400 text-sm mt-1">Assigned to Group {selectedGroup}</p>}
+                  </div>
+                )}
+
+                {/* Group date/time confirmation */}
+                {groupInfo && (
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl px-6 py-4 text-left space-y-2">
+                    <p className="text-xs text-amber-400/70 uppercase tracking-wider font-medium mb-3">Your Scheduled Session</p>
+                    {groupInfo.date && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-amber-400">📅</span>
+                        <p className="text-white font-medium">
+                          {new Date(groupInfo.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                        </p>
+                      </div>
+                    )}
+                    {groupInfo.time_slot && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-amber-400">🕐</span>
+                        <p className="text-white font-medium">{groupInfo.time_slot}</p>
+                      </div>
+                    )}
+                    {groupInfo.notes && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-amber-400">📍</span>
+                        <p className="text-white font-medium">{groupInfo.notes}</p>
+                      </div>
+                    )}
+                    <p className="text-amber-400/60 text-xs mt-3">A confirmation email has been sent to {student?.email}</p>
                   </div>
                 )}
                 {/* Summary of submitted data */}
