@@ -30,7 +30,7 @@ export async function getStudentsWithProgress() {
     .select(`
       *,
       supervisors ( id, name, email ),
-      student_milestones ( milestone_id, status, completed_at, due_date, notes )
+      student_milestones ( milestone_id, status, completed_at, due_date, notes, group_name, response_data )
     `)
     .order('name')
 
