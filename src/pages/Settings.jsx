@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Save, Plus, Trash2, Loader2, CheckCircle2, Database, Mail, Key } from 'lucide-react'
+import { Save, Plus, Trash2, Loader2, CheckCircle2, Database, Mail, Key, Users, Calendar } from 'lucide-react'
 import { supabase, getSupervisors } from '../lib/supabase'
 
 function Section({ title, icon: Icon, children }) {
@@ -9,6 +9,149 @@ function Section({ title, icon: Icon, children }) {
         <Icon size={17} className="text-gold-400" /> {title}
       </h2>
       {children}
+    </div>
+  )
+}
+
+
+const GROUP_MILESTONES = [
+  { id: 'proposal_defense', name: 'Proposal Defense' },
+  { id: 'progress_1',       name: 'First Progress Report' },
+  { id: 'progress_2',       name: 'Second Progress Report' },
+]
+
+function GroupManagement() {
+  const [groups, setGroups]     = useState({})
+  const [loading, setLoading]   = useState(true)
+  const [saving, setSaving]     = useState('')
+  const [saved, setSaved]       = useState('')
+
+  async function loadGroups() {
+    const result = {}
+    for (const m of GROUP_MILESTONES) {
+      const { data } = await supabase
+        .from('milestone_groups')
+        .select('*')
+        .eq('milestone_id', m.id)
+        .order('group_name')
+      result[m.id] = data || []
+    }
+    setGroups(result)
+    setLoading(false)
+  }
+
+  useEffect(() => { loadGroups() }, [])
+
+  function getGroup(milestoneId, groupName) {
+    return (groups[milestoneId] || []).find(g => g.group_name === groupName) || {}
+  }
+
+  function setGroupField(milestoneId, groupName, field, value) {
+    setGroups(prev => {
+      const list = [...(prev[milestoneId] || [])]
+      const idx  = list.findIndex(g => g.group_name === groupName)
+      if (idx >= 0) list[idx] = { ...list[idx], [field]: value }
+      else list.push({ milestone_id: milestoneId, group_name: groupName, [field]: value })
+      return { ...prev, [milestoneId]: list }
+    })
+  }
+
+  async function saveGroups(milestoneId) {
+    setSaving(milestoneId)
+    const list = groups[milestoneId] || []
+    for (const g of list) {
+      await supabase.from('milestone_groups').upsert(
+        { milestone_id: milestoneId, group_name: g.group_name, date: g.date || null, time_slot: g.time_slot || null, capacity: parseInt(g.capacity) || 15, notes: g.notes || '' },
+        { onConflict: 'milestone_id,group_name' }
+      )
+    }
+    // Make sure both A and B exist
+    for (const gn of ['A', 'B']) {
+      if (!list.find(g => g.group_name === gn)) {
+        await supabase.from('milestone_groups').upsert(
+          { milestone_id: milestoneId, group_name: gn, capacity: 15 },
+          { onConflict: 'milestone_id,group_name' }
+        )
+      }
+    }
+    setSaving('')
+    setSaved(milestoneId)
+    setTimeout(() => setSaved(''), 3000)
+    loadGroups()
+  }
+
+  return (
+    <div className="card p-6">
+      <h2 className="font-display font-semibold text-slate-100 flex items-center gap-2 mb-2">
+        <Users size={17} className="text-gold-400" /> Group Management
+      </h2>
+      <p className="text-xs text-navy-400 mb-5">
+        Set dates and capacity for Group A and Group B for each milestone.
+        Students will see available groups and cannot select a full one.
+      </p>
+
+      {loading ? (
+        <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-12 rounded-xl bg-navy-800/40 shimmer" />)}</div>
+      ) : (
+        <div className="space-y-6">
+          {GROUP_MILESTONES.map(m => (
+            <div key={m.id} className="border border-navy-700/40 rounded-2xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-medium text-slate-200">{m.name}</h3>
+                {saved === m.id && (
+                  <span className="text-xs text-emerald-400 flex items-center gap-1">
+                    <CheckCircle2 size={12} /> Saved
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {['A', 'B'].map(gn => {
+                  const g = getGroup(m.id, gn)
+                  return (
+                    <div key={gn} className="bg-navy-800/40 rounded-xl p-4 space-y-3">
+                      <p className="font-semibold text-gold-400">Group {gn}</p>
+                      <div>
+                        <label className="block text-xs text-navy-400 mb-1">Date</label>
+                        <input type="date" className="input"
+                          value={g.date || ''}
+                          onChange={e => setGroupField(m.id, gn, 'date', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-navy-400 mb-1">Time</label>
+                        <input type="text" className="input" placeholder="e.g. 10:00 AM"
+                          value={g.time_slot || ''}
+                          onChange={e => setGroupField(m.id, gn, 'time_slot', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-navy-400 mb-1">Capacity</label>
+                        <input type="number" className="input" min="1" max="50"
+                          value={g.capacity || 15}
+                          onChange={e => setGroupField(m.id, gn, 'capacity', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-navy-400 mb-1">Notes (optional)</label>
+                        <input type="text" className="input" placeholder="e.g. Room 301"
+                          value={g.notes || ''}
+                          onChange={e => setGroupField(m.id, gn, 'notes', e.target.value)} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <button
+                onClick={() => saveGroups(m.id)}
+                disabled={saving === m.id}
+                className="btn-primary mt-4 disabled:opacity-50"
+              >
+                {saving === m.id ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                {saving === m.id ? 'Saving…' : 'Save Groups'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -201,6 +344,10 @@ export default function Settings() {
           </ol>
         </div>
       </Section>
+
+      {/* Group Management */}
+      <GroupManagement />
+
     </div>
   )
 }
