@@ -46,7 +46,8 @@ function downloadCSV(rows, filename) {
 }
 
 async function downloadExcel(rows, filename, sheetName) {
-  const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs')
+  await loadScript('https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js')
+  const XLSX = window.XLSX
   const ws = XLSX.utils.json_to_sheet(rows)
   // Auto column widths
   const cols = Object.keys(rows[0] || {}).map(k => ({ wch: Math.max(k.length, 14) }))
@@ -57,9 +58,10 @@ async function downloadExcel(rows, filename, sheetName) {
 }
 
 async function downloadPDF(title, rows, filename, studentName = null) {
-  const jspdfModule = await import('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
-  const jsPDF = jspdfModule.jsPDF || jspdfModule.default?.jsPDF
-  await import('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js')
+  // Load jsPDF via script tag — more reliable than dynamic import in built apps
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js')
+  const jsPDF = window.jspdf?.jsPDF || window.jsPDF
 
   const isLandscape = rows.length && Object.keys(rows[0]).length > 6
   const doc = new jsPDF({ orientation: isLandscape ? 'landscape' : 'portrait' })
@@ -122,6 +124,17 @@ function trigger(blob, filename) {
   a.href = URL.createObjectURL(blob)
   a.download = filename
   a.click()
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return }
+    const s = document.createElement('script')
+    s.src = src
+    s.onload = resolve
+    s.onerror = reject
+    document.head.appendChild(s)
+  })
 }
 
 // ── Report builders ───────────────────────────────────────────────────────────
