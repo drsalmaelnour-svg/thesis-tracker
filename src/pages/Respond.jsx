@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams, Link } from 'react-router-dom'
-import { CheckCircle2, XCircle, Loader2, GraduationCap } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { CheckCircle2, XCircle, Loader2, GraduationCap, ArrowRight } from 'lucide-react'
 import { respondViaToken, MILESTONES } from '../lib/supabase'
 
 export default function Respond() {
@@ -17,7 +17,7 @@ export default function Respond() {
   useEffect(() => {
     if (!token || !milestoneId) {
       setStatus('error')
-      setMessage('Invalid link. Please check your email and try again.')
+      setMessage('This link appears to be invalid or incomplete. Please contact your thesis coordinator.')
       return
     }
 
@@ -28,60 +28,97 @@ export default function Respond() {
       })
       .catch(err => {
         setStatus('error')
-        setMessage(err.message || 'Something went wrong. Please contact the coordinator.')
+        setMessage(err.message || 'Something went wrong. Please contact your thesis coordinator.')
       })
   }, [token, milestoneId])
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6">
-      <div className="card max-w-md w-full p-10 text-center fade-in shadow-2xl border-navy-600/60">
-        {/* Logo */}
-        <div className="w-14 h-14 rounded-2xl bg-gold-500/20 border border-gold-500/40 flex items-center justify-center mx-auto mb-6">
-          <GraduationCap size={26} className="text-gold-400" />
-        </div>
+    <div
+      className="min-h-screen flex items-center justify-center p-6"
+      style={{
+        background: 'linear-gradient(135deg, #0f1f36 0%, #1e3a5f 50%, #0f1f36 100%)'
+      }}
+    >
+      <div className="w-full max-w-md">
 
-        {status === 'loading' && (
-          <>
-            <Loader2 size={36} className="text-gold-400 animate-spin mx-auto mb-4" />
-            <h2 className="font-display text-xl font-semibold text-slate-100 mb-2">Confirming…</h2>
-            <p className="text-navy-400 text-sm">Processing your milestone confirmation.</p>
-          </>
-        )}
+        {/* Card */}
+        <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-10 text-center shadow-2xl">
 
-        {status === 'success' && (
-          <>
-            <CheckCircle2 size={48} className="text-emerald-400 mx-auto mb-4" />
-            <h2 className="font-display text-2xl font-semibold text-slate-100 mb-2">Confirmed!</h2>
-            {student && <p className="text-navy-400 text-sm mb-4">Hi {student.name},</p>}
-            <p className="text-slate-300 mb-2">
-              Your milestone has been marked as complete:
-            </p>
-            {milestone && (
-              <div className="bg-emerald-900/20 border border-emerald-700/40 rounded-xl px-4 py-3 mt-3 mb-6">
-                <span className="text-2xl">{milestone.icon}</span>
-                <p className="text-emerald-300 font-medium mt-1">{milestone.name}</p>
+          {/* Logo */}
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center mx-auto mb-8">
+            <GraduationCap size={30} className="text-amber-400" />
+          </div>
+
+          {/* LOADING */}
+          {status === 'loading' && (
+            <div className="space-y-4">
+              <Loader2 size={40} className="text-amber-400 animate-spin mx-auto" />
+              <p className="text-slate-300 text-lg font-medium">Confirming your milestone…</p>
+              <p className="text-slate-500 text-sm">This will only take a moment.</p>
+            </div>
+          )}
+
+          {/* SUCCESS */}
+          {status === 'success' && (
+            <div className="space-y-5">
+              <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center mx-auto">
+                <CheckCircle2 size={32} className="text-emerald-400" />
               </div>
-            )}
-            <p className="text-navy-400 text-xs leading-relaxed">
-              Your thesis coordinator has been notified. You can close this page.
-            </p>
-          </>
-        )}
 
-        {status === 'error' && (
-          <>
-            <XCircle size={48} className="text-red-400 mx-auto mb-4" />
-            <h2 className="font-display text-2xl font-semibold text-slate-100 mb-2">Link Error</h2>
-            <p className="text-navy-400 text-sm mb-6 leading-relaxed">{message}</p>
-            <p className="text-navy-500 text-xs">
-              Please contact your thesis coordinator for assistance.
-            </p>
-          </>
-        )}
+              <div>
+                <h1 className="text-2xl font-bold text-white mb-1">
+                  Confirmed!
+                </h1>
+                {student && (
+                  <p className="text-slate-400 text-sm">Thank you, {student.name}</p>
+                )}
+              </div>
 
-        <div className="mt-8 pt-6 border-t border-navy-700/50">
-          <p className="text-xs text-navy-500">Thesis Coordination System</p>
+              {milestone && (
+                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl px-6 py-4 mt-2">
+                  <p className="text-3xl mb-2">{milestone.icon}</p>
+                  <p className="text-emerald-300 font-semibold text-lg">{milestone.name}</p>
+                  <p className="text-emerald-500 text-sm mt-1">Marked as complete</p>
+                </div>
+              )}
+
+              <div className="bg-white/5 rounded-2xl px-5 py-4 mt-4">
+                <p className="text-slate-400 text-sm leading-relaxed">
+                  Your thesis coordinator has been notified of your progress. 
+                  You can now close this page.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ERROR */}
+          {status === 'error' && (
+            <div className="space-y-5">
+              <div className="w-16 h-16 rounded-full bg-red-500/20 border border-red-400/30 flex items-center justify-center mx-auto">
+                <XCircle size={32} className="text-red-400" />
+              </div>
+
+              <div>
+                <h1 className="text-2xl font-bold text-white mb-1">Link Error</h1>
+                <p className="text-slate-400 text-sm leading-relaxed mt-3">{message}</p>
+              </div>
+
+              <div className="bg-white/5 rounded-2xl px-5 py-4">
+                <p className="text-slate-500 text-sm">
+                  If you think this is a mistake, please reply to the email you received 
+                  or contact your thesis coordinator directly.
+                </p>
+              </div>
+            </div>
+          )}
+
         </div>
+
+        {/* Footer */}
+        <p className="text-center text-slate-600 text-xs mt-6">
+          Thesis Coordination System · {new Date().getFullYear()}
+        </p>
+
       </div>
     </div>
   )
