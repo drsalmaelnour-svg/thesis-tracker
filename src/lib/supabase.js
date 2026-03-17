@@ -118,3 +118,54 @@ export async function logEmail({ studentId, recipientType, subject, template, mi
     milestone_id: milestoneId,
   })
 }
+
+// ── Group helpers ─────────────────────────────────────────────────────────────
+
+export async function getGroups(milestoneId) {
+  const { data, error } = await supabase
+    .from('milestone_groups')
+    .select('*')
+    .eq('milestone_id', milestoneId)
+    .order('group_name')
+  if (error) throw error
+  return data || []
+}
+
+export async function upsertGroup(milestoneId, groupName, fields) {
+  const { error } = await supabase
+    .from('milestone_groups')
+    .upsert({ milestone_id: milestoneId, group_name: groupName, ...fields },
+      { onConflict: 'milestone_id,group_name' })
+  if (error) throw error
+}
+
+export async function getGroupEnrollment(milestoneId, groupName) {
+  const { count, error } = await supabase
+    .from('student_milestones')
+    .select('*', { count: 'exact', head: true })
+    .eq('milestone_id', milestoneId)
+    .eq('group_name', groupName)
+  if (error) throw error
+  return count || 0
+}
+
+export async function assignStudentGroup(studentId, milestoneId, groupName, responseData = {}) {
+  const notes = Object.entries(responseData)
+    .filter(([, v]) => v)
+    .map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`)
+    .join(' | ')
+
+  const { error } = await supabase
+    .from('student_milestones')
+    .upsert({
+      student_id: studentId,
+      milestone_id: milestoneId,
+      status: 'completed',
+      group_name: groupName,
+      response_data: responseData,
+      notes,
+      completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'student_id,milestone_id' })
+  if (error) throw error
+}
