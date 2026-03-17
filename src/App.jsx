@@ -6,6 +6,7 @@ import StudentDetail from './pages/StudentDetail'
 import EmailCenter from './pages/EmailCenter'
 import Reminders from './pages/Reminders'
 import Settings from './pages/Settings'
+import Reports from './pages/Reports'
 import Respond from './pages/Respond'
 
 function Layout({ children }) {
@@ -32,6 +33,7 @@ export default function App() {
         <Route path="/students/:id" element={<Layout><StudentDetail /></Layout>} />
         <Route path="/emails" element={<Layout><EmailCenter /></Layout>} />
         <Route path="/reminders" element={<Layout><Reminders /></Layout>} />
+        <Route path="/reports"  element={<Layout><Reports /></Layout>} />
         <Route path="/settings" element={<Layout><Settings /></Layout>} />
       </Routes>
     </HashRouter>
