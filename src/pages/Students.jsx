@@ -42,7 +42,7 @@ export default function Students() {
       filter === 'all' ? true :
       filter === 'overdue' ? milestones.some(m => m.status === 'overdue') :
       filter === 'complete' ? milestones.filter(m => m.status === 'completed').length === MILESTONES.length :
-      filter === 'on_track' ? !milestones.some(m => m.status === 'overdue')
+      filter === 'on_track' ? !milestones.some(m => m.status === 'overdue') : true
 
     return matchesSearch && matchesFilter
   })
