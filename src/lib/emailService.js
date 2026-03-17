@@ -6,7 +6,22 @@ const SERVICE_ID      = import.meta.env.VITE_EMAILJS_SERVICE_ID
 const STUDENT_TPL     = import.meta.env.VITE_EMAILJS_STUDENT_TEMPLATE
 const SUPERVISOR_TPL  = import.meta.env.VITE_EMAILJS_SUPERVISOR_TEMPLATE
 const REMINDER_TPL    = import.meta.env.VITE_EMAILJS_REMINDER_TEMPLATE
-const APP_URL         = import.meta.env.VITE_APP_URL || window.location.origin + '/thesis-tracker'
+
+// Always derive the URL from the actual browser location — works on any host
+function getBaseUrl() {
+  const origin = window.location.origin
+  const path = window.location.pathname.split('#')[0].replace(/\/$/, '')
+  return origin + path
+}
+
+function responseLink(token, milestoneId) {
+  const base = getBaseUrl()
+  return `${base}/#/respond?t=${encodeURIComponent(token)}&m=${encodeURIComponent(milestoneId)}`
+}
+
+function milestoneLabel(id) {
+  return MILESTONES.find(m => m.id === id)?.name || id
+}
 
 let initialized = false
 function init() {
@@ -16,15 +31,6 @@ function init() {
   }
 }
 
-function milestoneLabel(id) {
-  return MILESTONES.find(m => m.id === id)?.name || id
-}
-
-function responseLink(token, milestoneId) {
-  return `${APP_URL}/#/respond?t=${encodeURIComponent(token)}&m=${encodeURIComponent(milestoneId)}`
-}
-
-// ── Core sender ───────────────────────────────────────────────────────────────
 async function send(templateId, params) {
   init()
   if (!PUBLIC_KEY || !SERVICE_ID) {
@@ -40,8 +46,6 @@ async function send(templateId, params) {
   }
 }
 
-// ── Public API ────────────────────────────────────────────────────────────────
-
 export async function sendStudentEmail({ student, milestoneId, subject, message }) {
   return send(STUDENT_TPL, {
     to_email:      student.email,
@@ -50,7 +54,6 @@ export async function sendStudentEmail({ student, milestoneId, subject, message 
     message,
     milestone:     milestoneLabel(milestoneId),
     response_link: milestoneId ? responseLink(student.token, milestoneId) : '',
-    app_url:       APP_URL,
   })
 }
 
@@ -62,35 +65,26 @@ export async function sendSupervisorEmail({ supervisor, student, milestoneId, su
     subject,
     message,
     milestone:    milestoneLabel(milestoneId),
-    app_url:      APP_URL,
   })
 }
 
 export async function sendReminder({ student, supervisor, milestoneId, dueDate }) {
-  const milestone = milestoneLabel(milestoneId)
-  const params = {
-    to_email:      student.email,
-    to_name:       student.name,
-    supervisor_email: supervisor?.email || '',
-    supervisor_name:  supervisor?.name  || '',
-    milestone,
-    due_date:      dueDate || 'as soon as possible',
-    response_link: responseLink(student.token, milestoneId),
-    app_url:       APP_URL,
-  }
-  return send(REMINDER_TPL, params)
+  return send(REMINDER_TPL, {
+    to_email:        student.email,
+    to_name:         student.name,
+    supervisor_name: supervisor?.name || '',
+    milestone:       milestoneLabel(milestoneId),
+    due_date:        dueDate || 'as soon as possible',
+    response_link:   responseLink(student.token, milestoneId),
+  })
 }
 
 export async function sendBulkReminders(students, milestoneId) {
   const results = []
   for (const s of students) {
-    const r = await sendReminder({
-      student: s,
-      supervisor: s.supervisors,
-      milestoneId,
-    })
+    const r = await sendReminder({ student: s, supervisor: s.supervisors, milestoneId })
     results.push({ student: s.name, ...r })
-    await new Promise(res => setTimeout(res, 300)) // rate-limit
+    await new Promise(res => setTimeout(res, 300))
   }
   return results
 }
