@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { X, Send, Loader2, ChevronDown } from 'lucide-react'
 import { EMAIL_TEMPLATES, SUPERVISOR_TEMPLATES } from '../lib/emailTemplates'
+import { getEmailTemplates } from '../lib/supabase'
 import { sendStudentEmail, sendSupervisorEmail } from '../lib/emailService'
 import { logEmail } from '../lib/supabase'
 import { MILESTONES } from '../lib/supabase'
@@ -13,12 +14,27 @@ export default function EmailModal({ student, onClose }) {
   const [milestoneId, setMilestoneId] = useState('')
   const [sending, setSending] = useState(false)
   const [result, setResult] = useState(null)
+  const [mergedTemplates, setMergedTemplates] = useState(EMAIL_TEMPLATES)
 
-  const templates = recipient === 'student' ? EMAIL_TEMPLATES : SUPERVISOR_TEMPLATES
+  useEffect(() => {
+    getEmailTemplates().then(dbTemplates => {
+      if (dbTemplates.length > 0) {
+        const merged = { ...EMAIL_TEMPLATES }
+        for (const t of dbTemplates) {
+          if (merged[t.template_key]) {
+            merged[t.template_key] = { ...merged[t.template_key], subject: t.subject, body: t.body }
+          }
+        }
+        setMergedTemplates(merged)
+      }
+    }).catch(() => {})
+  }, [])
+
+  const templates = recipient === 'student' ? mergedTemplates : SUPERVISOR_TEMPLATES
 
   function applyTemplate(key) {
     setSelectedTemplate(key)
-    const tpl = templates[key]
+    const tpl = (recipient === 'student' ? mergedTemplates : SUPERVISOR_TEMPLATES)[key]
     if (!tpl) return
     const fill = (s) => s
       .replace(/{{student_name}}/g, student.name)

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Mail, Send, Clock, Loader2, ChevronDown, Users } from 'lucide-react'
-import { getStudentsWithProgress, getEmailLog, logEmail, MILESTONES } from '../lib/supabase'
+import { getStudentsWithProgress, getEmailLog, logEmail, MILESTONES, getEmailTemplates } from '../lib/supabase'
 import { sendStudentEmail, sendSupervisorEmail, sendBulkReminders } from '../lib/emailService'
 import { EMAIL_TEMPLATES } from '../lib/emailTemplates'
 import { formatDistanceToNow } from 'date-fns'
@@ -22,10 +22,24 @@ export default function EmailCenter() {
   const [sending, setSending] = useState(false)
   const [sendResult, setSendResult] = useState(null)
 
+  const [mergedTemplates, setMergedTemplates] = useState(EMAIL_TEMPLATES)
+
   useEffect(() => {
     Promise.all([
       getStudentsWithProgress().then(setStudents),
       getEmailLog().then(setLog),
+      // Load DB overrides and merge with defaults
+      getEmailTemplates().then(dbTemplates => {
+        if (dbTemplates.length > 0) {
+          const merged = { ...EMAIL_TEMPLATES }
+          for (const t of dbTemplates) {
+            if (merged[t.template_key]) {
+              merged[t.template_key] = { ...merged[t.template_key], subject: t.subject, body: t.body }
+            }
+          }
+          setMergedTemplates(merged)
+        }
+      }).catch(() => {}),
     ]).finally(() => setLoading(false))
   }, [])
 
@@ -41,7 +55,7 @@ export default function EmailCenter() {
 
   function applyTemplate(key) {
     setTemplateKey(key)
-    const tpl = EMAIL_TEMPLATES[key]
+    const tpl = mergedTemplates[key]
     if (!tpl) return
     setSubject(tpl.subject.replace(/{{student_name}}/g, '[Student Name]'))
     setBody(tpl.body.replace(/{{student_name}}/g, '[Student Name]').replace(/{{response_link}}/g, '[Response link]').replace(/{{due_date}}/g, 'the required date'))
