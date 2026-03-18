@@ -9,6 +9,9 @@ import Settings from './pages/Settings'
 import Reports from './pages/Reports'
 import SupervisorRespond from './pages/SupervisorRespond'
 import Checkins from './pages/Checkins'
+import Analytics from './pages/Analytics'
+import CalendarPage from './pages/CalendarPage'
+import Deadlines from './pages/Deadlines'
 import StudentCheckin from './pages/StudentCheckin'
 import Respond from './pages/Respond'
 
@@ -38,7 +41,10 @@ export default function App() {
         <Route path="/emails" element={<Layout><EmailCenter /></Layout>} />
         <Route path="/reminders" element={<Layout><Reminders /></Layout>} />
         <Route path="/reports"  element={<Layout><Reports /></Layout>} />
-        <Route path="/checkins" element={<Layout><Checkins /></Layout>} />
+        <Route path="/checkins"   element={<Layout><Checkins /></Layout>} />
+        <Route path="/analytics"  element={<Layout><Analytics /></Layout>} />
+        <Route path="/calendar"   element={<Layout><CalendarPage /></Layout>} />
+        <Route path="/deadlines"  element={<Layout><Deadlines /></Layout>} />
         <Route path="/student-checkin" element={<StudentCheckin />} />
         <Route path="/settings" element={<Layout><Settings /></Layout>} />
       </Routes>
