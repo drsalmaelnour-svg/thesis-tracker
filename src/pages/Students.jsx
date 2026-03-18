@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { UserPlus, Search, Mail, ArrowRight, Upload, Edit2 } from 'lucide-react'
+import { UserPlus, Search, Mail, ArrowRight, Upload, Edit2, CheckSquare, Square, ChevronDown, Loader2 } from 'lucide-react'
+import { updateMilestoneStatus, MILESTONES, logActivity } from '../lib/supabase'
 import { getStudentsWithProgress, MILESTONES } from '../lib/supabase'
 import { MilestoneBar } from '../components/MilestoneProgress'
 import AddStudentModal from '../components/AddStudentModal'
@@ -23,6 +24,28 @@ export default function Students() {
   const [showImport, setShowImport] = useState(false)
   const [editStudent, setEditStudent] = useState(null)
   const [emailStudent, setEmailStudent] = useState(null)
+  const [selected, setSelected] = useState([])
+  const [bulkMilestone, setBulkMilestone] = useState('')
+  const [bulkApplying, setBulkApplying] = useState(false)
+
+  function toggleSelect(id) {
+    setSelected(s => s.includes(id) ? s.filter(x=>x!==id) : [...s, id])
+  }
+  function toggleAll() {
+    setSelected(s => s.length === filtered.length ? [] : filtered.map(s=>s.id))
+  }
+  async function applyBulkMilestone() {
+    if (!bulkMilestone || !selected.length) return
+    setBulkApplying(true)
+    const m = MILESTONES.find(x=>x.id===bulkMilestone)
+    for (const studentId of selected) {
+      await updateMilestoneStatus(studentId, bulkMilestone, 'completed')
+      await logActivity(studentId, 'milestone', `Bulk update: "${m?.name}" marked as completed`)
+    }
+    setSelected([]); setBulkMilestone('')
+    setBulkApplying(false)
+    load()
+  }
 
   async function load() {
     setLoading(true)
@@ -111,6 +134,14 @@ export default function Students() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-navy-700/50">
+                <th className="p-4">
+                  <button onClick={toggleAll} className="text-navy-400 hover:text-gold-300">
+                    {selected.length === filtered.length && filtered.length > 0
+                      ? <CheckSquare size={15} className="text-gold-400"/>
+                      : <Square size={15}/>
+                    }
+                  </button>
+                </th>
                 <th className="text-left p-4 text-xs font-medium text-navy-400 uppercase tracking-wider">Student</th>
                 <th className="text-left p-4 text-xs font-medium text-navy-400 uppercase tracking-wider">Supervisor</th>
                 <th className="text-left p-4 text-xs font-medium text-navy-400 uppercase tracking-wider">Progress</th>
@@ -128,8 +159,16 @@ export default function Students() {
                 return (
                   <tr
                     key={student.id}
-                    className="border-b border-navy-700/30 hover:bg-navy-800/30 transition-all group"
+                    className={`border-b border-navy-700/30 hover:bg-navy-800/30 transition-all group ${selected.includes(student.id)?'bg-gold-500/5':''}`}
                   >
+                    <td className="p-4">
+                      <button onClick={()=>toggleSelect(student.id)} className="text-navy-400 hover:text-gold-300">
+                        {selected.includes(student.id)
+                          ? <CheckSquare size={15} className="text-gold-400"/>
+                          : <Square size={15}/>
+                        }
+                      </button>
+                    </td>
                     <td className="p-4">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-navy-700 flex items-center justify-center text-sm font-semibold text-gold-400 shrink-0">
@@ -199,6 +238,24 @@ export default function Students() {
           </table>
         )}
       </div>
+
+      {/* Bulk action bar */}
+      {selected.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 card px-5 py-3 flex items-center gap-4 shadow-2xl border-gold-500/30 fade-in">
+          <span className="text-sm font-medium text-gold-300">{selected.length} student{selected.length!==1?'s':''} selected</span>
+          <select className="input text-sm py-1.5 w-52"
+            value={bulkMilestone} onChange={e=>setBulkMilestone(e.target.value)}>
+            <option value="">— Mark milestone as complete —</option>
+            {MILESTONES.map(m=><option key={m.id} value={m.id}>{m.icon} {m.name}</option>)}
+          </select>
+          <button onClick={applyBulkMilestone} disabled={bulkApplying||!bulkMilestone}
+            className="btn-primary py-1.5 disabled:opacity-50">
+            {bulkApplying?<Loader2 size={13} className="animate-spin"/>:<CheckSquare size={13}/>}
+            {bulkApplying?'Applying…':'Apply'}
+          </button>
+          <button onClick={()=>setSelected([])} className="btn-ghost py-1.5 text-xs">Clear</button>
+        </div>
+      )}
 
       {showAdd && <AddStudentModal onClose={() => setShowAdd(false)} onSuccess={load} />}
       {editStudent && <AddStudentModal student={editStudent} onClose={() => setEditStudent(null)} onSuccess={load} />}
