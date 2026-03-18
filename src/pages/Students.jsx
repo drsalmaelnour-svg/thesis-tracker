@@ -5,7 +5,9 @@ import { getStudentsWithProgress, updateMilestoneStatus, MILESTONES, logActivity
 import { MilestoneBar } from '../components/MilestoneProgress'
 import AddStudentModal from '../components/AddStudentModal'
 import EmailModal from '../components/EmailModal'
-import ImportModal from '../components/ImportModal'const STATUS_LABELS = {
+import ImportModal from '../components/ImportModal'
+
+const STATUS_LABELS = {
   all: 'All Students',
   on_track: 'On Track',
   overdue: 'Has Overdue',

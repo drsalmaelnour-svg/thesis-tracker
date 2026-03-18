@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import {
-  LayoutDashboard, Users, Mail, Settings, GraduationCap, Bell, FileText, ClipboardList
+  LayoutDashboard, Users, Mail, Settings, GraduationCap, Bell, FileText, ClipboardList, TrendingUp, Calendar, Clock
 } from 'lucide-react'
 
 const NAV = [
@@ -9,7 +9,10 @@ const NAV = [
   { to: '/emails',   icon: Mail,            label: 'Email Center' },
   { to: '/reminders',icon: Bell,            label: 'Reminders' },
   { to: '/reports',  icon: FileText,         label: 'Reports'   },
-  { to: '/checkins', icon: ClipboardList, label: 'Check-ins' },
+  { to: '/checkins',  icon: ClipboardList, label: 'Check-ins'   },
+  { to: '/deadlines', icon: Clock,        label: 'Deadlines'   },
+  { to: '/analytics', icon: TrendingUp,   label: 'Analytics'   },
+  { to: '/calendar',  icon: Calendar,     label: 'Calendar'    },
   { to: '/settings', icon: Settings,        label: 'Settings'  },
 ]
 

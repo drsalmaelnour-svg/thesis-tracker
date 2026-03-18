@@ -208,3 +208,141 @@ export function getStudentCheckinLink(studentToken) {
   const base = window.location.origin + window.location.pathname.split('#')[0].replace(/\/$/, '')
   return `${base}/#/student-checkin?t=${studentToken}`
 }
+
+// ── Deadline helpers ──────────────────────────────────────────────────────────
+
+export async function getCohortDeadlines(cohortYear) {
+  const { data, error } = await supabase
+    .from('cohort_deadlines').select('*').eq('cohort_year', cohortYear).order('milestone_id')
+  if (error) throw error
+  return data || []
+}
+
+export async function upsertCohortDeadline(cohortYear, milestoneId, dueDate, notes = '') {
+  const { error } = await supabase.from('cohort_deadlines').upsert(
+    { cohort_year: cohortYear, milestone_id: milestoneId, due_date: dueDate, notes, updated_at: new Date().toISOString() },
+    { onConflict: 'cohort_year,milestone_id' }
+  )
+  if (error) throw error
+}
+
+export async function getStudentDeadlineOverrides(studentId) {
+  const { data, error } = await supabase
+    .from('student_deadline_overrides').select('*').eq('student_id', studentId)
+  if (error) throw error
+  return data || []
+}
+
+export async function upsertStudentDeadlineOverride(studentId, milestoneId, dueDate, notes = '') {
+  const { error } = await supabase.from('student_deadline_overrides').upsert(
+    { student_id: studentId, milestone_id: milestoneId, due_date: dueDate, notes },
+    { onConflict: 'student_id,milestone_id' }
+  )
+  if (error) throw error
+}
+
+// ── Notes helpers ─────────────────────────────────────────────────────────────
+
+export async function getStudentNotes(studentId) {
+  const { data, error } = await supabase
+    .from('student_notes').select('*').eq('student_id', studentId).order('created_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function addStudentNote(studentId, content) {
+  const { error } = await supabase.from('student_notes').insert({ student_id: studentId, content })
+  if (error) throw error
+  await logActivity(studentId, 'note', `Note added: ${content.slice(0, 60)}${content.length > 60 ? '…' : ''}`)
+}
+
+export async function deleteStudentNote(noteId) {
+  const { error } = await supabase.from('student_notes').delete().eq('id', noteId)
+  if (error) throw error
+}
+
+// ── Activity log helpers ──────────────────────────────────────────────────────
+
+export async function logActivity(studentId, type, description, metadata = {}) {
+  await supabase.from('activity_log').insert({ student_id: studentId, type, description, metadata })
+}
+
+export async function getStudentActivity(studentId) {
+  const { data, error } = await supabase
+    .from('activity_log').select('*').eq('student_id', studentId).order('created_at', { ascending: false }).limit(50)
+  if (error) throw error
+  return data || []
+}
+
+export async function getRecentActivity(limit = 15) {
+  const { data, error } = await supabase
+    .from('activity_log')
+    .select('*, students(name, student_id)')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return data || []
+}
+
+// ── Calendar helpers ──────────────────────────────────────────────────────────
+
+export async function getCalendarEvents(cohortYear) {
+  const { data, error } = await supabase
+    .from('academic_calendar').select('*').eq('cohort_year', cohortYear).order('event_date')
+  if (error) throw error
+  return data || []
+}
+
+export async function upsertCalendarEvent(event) {
+  const { error } = await supabase.from('academic_calendar').upsert(
+    { ...event, updated_at: new Date().toISOString() },
+    { onConflict: 'id' }
+  )
+  if (error) throw error
+}
+
+export async function deleteCalendarEvent(id) {
+  const { error } = await supabase.from('academic_calendar').delete().eq('id', id)
+  if (error) throw error
+}
+
+// ── Analytics helpers ─────────────────────────────────────────────────────────
+
+export async function getCohortAnalytics(cohortYear, students) {
+  const cohortStudents = cohortYear === 'all'
+    ? students
+    : students.filter(s => String(s.enrollment_year) === String(cohortYear))
+
+  const total = cohortStudents.length
+  if (!total) return null
+
+  // Milestone completion rates
+  const milestoneStats = MILESTONES.map(m => {
+    const completed = cohortStudents.filter(s =>
+      (s.student_milestones || []).find(sm => sm.milestone_id === m.id && sm.status === 'completed')
+    ).length
+    return { ...m, completed, rate: total ? Math.round((completed / total) * 100) : 0 }
+  })
+
+  // Overall completion
+  const totalCompleted = cohortStudents.reduce((acc, s) => {
+    return acc + (s.student_milestones || []).filter(sm => sm.status === 'completed').length
+  }, 0)
+  const maxPossible = total * MILESTONES.length
+  const overallRate = maxPossible ? Math.round((totalCompleted / maxPossible) * 100) : 0
+
+  // Status breakdown
+  const overdue   = cohortStudents.filter(s => (s.student_milestones||[]).some(m=>m.status==='overdue')).length
+  const onTrack   = cohortStudents.filter(s => {
+    const ms = s.student_milestones || []
+    return !ms.some(m=>m.status==='overdue') && ms.some(m=>m.status==='completed')
+  }).length
+  const notStarted = cohortStudents.filter(s =>
+    !(s.student_milestones||[]).some(m=>m.status==='completed')
+  ).length
+  const complete = cohortStudents.filter(s =>
+    (s.student_milestones||[]).filter(m=>m.status==='completed').length === MILESTONES.length
+  ).length
+
+  return { total, overallRate, milestoneStats, overdue, onTrack, notStarted, complete, cohortStudents }
+}
