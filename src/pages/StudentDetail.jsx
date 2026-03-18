@@ -4,6 +4,7 @@ import { ArrowLeft, Mail, Edit2, Save, X, ExternalLink, Bell } from 'lucide-reac
 import { getStudent, updateMilestoneStatus, MILESTONES } from '../lib/supabase'
 import { MilestoneSteps } from '../components/MilestoneProgress'
 import EmailModal from '../components/EmailModal'
+import AddStudentModal from '../components/AddStudentModal'
 import { sendReminder } from '../lib/emailService'
 
 export default function StudentDetail() {
@@ -11,6 +12,7 @@ export default function StudentDetail() {
   const [student, setStudent] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showEmail, setShowEmail] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
   const [editTitle, setEditTitle] = useState(false)
   const [title, setTitle] = useState('')
   const [reminderStatus, setReminderStatus] = useState({})
@@ -85,9 +87,14 @@ export default function StudentDetail() {
               {student.student_id && <p className="text-navy-500 text-xs">ID: {student.student_id}</p>}
             </div>
           </div>
-          <button onClick={() => setShowEmail(true)} className="btn-primary">
-            <Mail size={15} /> Send Email
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => setShowEdit(true)} className="btn-secondary">
+              <Edit2 size={15} /> Edit
+            </button>
+            <button onClick={() => setShowEmail(true)} className="btn-primary">
+              <Mail size={15} /> Send Email
+            </button>
+          </div>
         </div>
       </div>
 
@@ -244,6 +251,7 @@ export default function StudentDetail() {
       </div>
 
       {showEmail && <EmailModal student={student} onClose={() => setShowEmail(false)} />}
+      {showEdit && <AddStudentModal student={student} onClose={() => setShowEdit(false)} onSuccess={load} />}
     </div>
   )
 }
