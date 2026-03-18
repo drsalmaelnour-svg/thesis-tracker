@@ -1,5 +1,5 @@
 import emailjs from '@emailjs/browser'
-import { MILESTONES } from './supabase'
+import { MILESTONES, getEmailTemplate } from './supabase'
 
 const PUBLIC_KEY      = import.meta.env.VITE_EMAILJS_PUBLIC_KEY
 const SERVICE_ID      = import.meta.env.VITE_EMAILJS_SERVICE_ID
@@ -21,6 +21,15 @@ function responseLink(token, milestoneId) {
 
 function milestoneLabel(id) {
   return MILESTONES.find(m => m.id === id)?.name || id
+}
+
+// Get template subject/body — checks DB override first, falls back to default
+async function resolveTemplate(templateKey, defaults) {
+  try {
+    const override = await getEmailTemplate(templateKey)
+    if (override) return { subject: override.subject, body: override.body }
+  } catch(e) { /* fall through to defaults */ }
+  return defaults
 }
 
 let initialized = false

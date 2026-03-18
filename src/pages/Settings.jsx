@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Save, Plus, Trash2, Loader2, CheckCircle2, Database, Mail, Key, Users, Calendar } from 'lucide-react'
+import TemplateEditor from '../components/TemplateEditor'
 import { supabase, getSupervisors } from '../lib/supabase'
 
 function Section({ title, icon: Icon, children }) {
@@ -363,6 +364,9 @@ export default function Settings() {
 
       {/* Group Management */}
       <GroupManagement />
+
+      {/* Email Template Editor */}
+      <TemplateEditor />
 
     </div>
   )

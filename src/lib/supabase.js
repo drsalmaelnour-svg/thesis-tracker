@@ -346,3 +346,26 @@ export async function getCohortAnalytics(cohortYear, students) {
 
   return { total, overallRate, milestoneStats, overdue, onTrack, notStarted, complete, cohortStudents }
 }
+
+// ── Email template helpers ────────────────────────────────────────────────────
+
+export async function getEmailTemplates() {
+  const { data, error } = await supabase
+    .from('email_templates').select('*').order('label')
+  if (error) throw error
+  return data || []
+}
+
+export async function saveEmailTemplate(templateKey, label, subject, body) {
+  const { error } = await supabase.from('email_templates').upsert(
+    { template_key: templateKey, label, subject, body, updated_at: new Date().toISOString() },
+    { onConflict: 'template_key' }
+  )
+  if (error) throw error
+}
+
+export async function getEmailTemplate(templateKey) {
+  const { data } = await supabase
+    .from('email_templates').select('*').eq('template_key', templateKey).single()
+  return data || null
+}
