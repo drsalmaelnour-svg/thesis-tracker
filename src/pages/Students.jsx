@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { UserPlus, Search, Mail, ArrowRight, Upload } from 'lucide-react'
+import { UserPlus, Search, Mail, ArrowRight, Upload, Edit2 } from 'lucide-react'
 import { getStudentsWithProgress, MILESTONES } from '../lib/supabase'
 import { MilestoneBar } from '../components/MilestoneProgress'
 import AddStudentModal from '../components/AddStudentModal'
@@ -21,6 +21,7 @@ export default function Students() {
   const [filter, setFilter] = useState('all')
   const [showAdd, setShowAdd] = useState(false)
   const [showImport, setShowImport] = useState(false)
+  const [editStudent, setEditStudent] = useState(null)
   const [emailStudent, setEmailStudent] = useState(null)
 
   async function load() {
@@ -169,6 +170,13 @@ export default function Students() {
                     <td className="p-4">
                       <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
+                          onClick={e => { e.preventDefault(); setEditStudent(student) }}
+                          className="btn-ghost p-2 rounded-lg"
+                          title="Edit student"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
                           onClick={e => { e.preventDefault(); setEmailStudent(student) }}
                           className="btn-ghost p-2 rounded-lg"
                           title="Send email"
@@ -193,6 +201,7 @@ export default function Students() {
       </div>
 
       {showAdd && <AddStudentModal onClose={() => setShowAdd(false)} onSuccess={load} />}
+      {editStudent && <AddStudentModal student={editStudent} onClose={() => setEditStudent(null)} onSuccess={load} />}
       {showImport && <ImportModal onClose={() => setShowImport(false)} onSuccess={load} />}
       {emailStudent && <EmailModal student={emailStudent} onClose={() => setEmailStudent(null)} />}
     </div>
