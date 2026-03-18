@@ -9,7 +9,7 @@ const NAV = [
   { to: '/emails',   icon: Mail,            label: 'Email Center' },
   { to: '/reminders',icon: Bell,            label: 'Reminders' },
   { to: '/reports',  icon: FileText,         label: 'Reports'   },
-  { to: '/supervisor-checkins', icon: ClipboardList, label: 'Supervisor Check-ins' },
+  { to: '/checkins', icon: ClipboardList, label: 'Check-ins' },
   { to: '/settings', icon: Settings,        label: 'Settings'  },
 ]
 
