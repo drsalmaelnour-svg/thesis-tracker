@@ -46,14 +46,19 @@ async function send(templateId, params) {
   }
 }
 
-export async function sendStudentEmail({ student, milestoneId, subject, message }) {
+export async function sendStudentEmail({ student, milestoneId, subject, message, response_link: customLink = null }) {
+  // Use custom link if provided (e.g. check-ins), otherwise build from milestoneId
+  const link = customLink !== null
+    ? customLink
+    : milestoneId ? responseLink(student.token, milestoneId) : ''
+
   return send(STUDENT_TPL, {
     to_email:      student.email,
     to_name:       student.name,
     subject,
     message,
-    milestone:     milestoneLabel(milestoneId),
-    response_link: milestoneId ? responseLink(student.token, milestoneId) : '',
+    milestone:     milestoneId ? milestoneLabel(milestoneId) : 'Check-in',
+    response_link: link,
   })
 }
 
