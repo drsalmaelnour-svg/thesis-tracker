@@ -169,3 +169,26 @@ export async function assignStudentGroup(studentId, milestoneId, groupName, resp
     }, { onConflict: 'student_id,milestone_id' })
   if (error) throw error
 }
+
+// ── Supervisor check-in helpers ───────────────────────────────────────────────
+
+export async function getSupervisorCheckins() {
+  const { data, error } = await supabase
+    .from('supervisor_checkins')
+    .select(`
+      *,
+      supervisors ( id, name, email ),
+      students ( id, name, student_id, program )
+    `)
+    .order('submitted_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function getCheckinLink(supervisorId, studentId) {
+  const { data: sup } = await supabase
+    .from('supervisors').select('token').eq('id', supervisorId).single()
+  if (!sup?.token) return null
+  const base = window.location.origin + window.location.pathname.split('#')[0].replace(/\/$/, '')
+  return `${base}/#/supervisor-respond?t=${sup.token}&s=${studentId}`
+}
