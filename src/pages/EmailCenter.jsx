@@ -25,21 +25,27 @@ export default function EmailCenter() {
   const [mergedTemplates, setMergedTemplates] = useState(EMAIL_TEMPLATES)
 
   useEffect(() => {
+    // Load DB template overrides first
+    getEmailTemplates().then(dbTemplates => {
+      if (dbTemplates.length > 0) {
+        const merged = { ...EMAIL_TEMPLATES }
+        for (const t of dbTemplates) {
+          if (merged[t.template_key]) {
+            merged[t.template_key] = {
+              ...merged[t.template_key],
+              subject: t.subject,
+              body: t.body,
+            }
+          }
+        }
+        setMergedTemplates(merged)
+      }
+    }).catch(e => console.error('Failed to load DB templates:', e))
+
+    // Load students and email log
     Promise.all([
       getStudentsWithProgress().then(setStudents),
       getEmailLog().then(setLog),
-      // Load DB overrides and merge with defaults
-      getEmailTemplates().then(dbTemplates => {
-        if (dbTemplates.length > 0) {
-          const merged = { ...EMAIL_TEMPLATES }
-          for (const t of dbTemplates) {
-            if (merged[t.template_key]) {
-              merged[t.template_key] = { ...merged[t.template_key], subject: t.subject, body: t.body }
-            }
-          }
-          setMergedTemplates(merged)
-        }
-      }).catch(() => {}),
     ]).finally(() => setLoading(false))
   }, [])
 
