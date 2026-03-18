@@ -7,8 +7,9 @@ import EmailCenter from './pages/EmailCenter'
 import Reminders from './pages/Reminders'
 import Settings from './pages/Settings'
 import Reports from './pages/Reports'
-import SupervisorCheckins from './pages/SupervisorCheckins'
 import SupervisorRespond from './pages/SupervisorRespond'
+import Checkins from './pages/Checkins'
+import StudentCheckin from './pages/StudentCheckin'
 import Respond from './pages/Respond'
 
 function Layout({ children }) {
@@ -37,7 +38,8 @@ export default function App() {
         <Route path="/emails" element={<Layout><EmailCenter /></Layout>} />
         <Route path="/reminders" element={<Layout><Reminders /></Layout>} />
         <Route path="/reports"  element={<Layout><Reports /></Layout>} />
-        <Route path="/supervisor-checkins" element={<Layout><SupervisorCheckins /></Layout>} />
+        <Route path="/checkins" element={<Layout><Checkins /></Layout>} />
+        <Route path="/student-checkin" element={<StudentCheckin />} />
         <Route path="/settings" element={<Layout><Settings /></Layout>} />
       </Routes>
     </HashRouter>
