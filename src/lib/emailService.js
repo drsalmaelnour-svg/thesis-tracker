@@ -57,14 +57,16 @@ export async function sendStudentEmail({ student, milestoneId, subject, message 
   })
 }
 
-export async function sendSupervisorEmail({ supervisor, student, milestoneId, subject, message }) {
+export async function sendSupervisorEmail({ supervisor, student, milestoneId, subject, message, response_link = '' }) {
   return send(SUPERVISOR_TPL, {
-    to_email:     supervisor.email,
-    to_name:      supervisor.name,
-    student_name: student.name,
+    to_email:      supervisor.email,
+    to_name:       supervisor.name,
+    student_name:  student.name,
+    student_id:    student.student_id || student.email || '',
     subject,
     message,
-    milestone:    milestoneLabel(milestoneId),
+    milestone:     milestoneId ? milestoneLabel(milestoneId) : 'General Communication',
+    response_link,
   })
 }
 
