@@ -192,3 +192,19 @@ export async function getCheckinLink(supervisorId, studentId) {
   const base = window.location.origin + window.location.pathname.split('#')[0].replace(/\/$/, '')
   return `${base}/#/supervisor-respond?t=${sup.token}&s=${studentId}`
 }
+
+// ── Student check-in helpers ──────────────────────────────────────────────────
+
+export async function getStudentCheckins() {
+  const { data, error } = await supabase
+    .from('student_checkins')
+    .select(`*, students ( id, name, student_id, program, enrollment_year, supervisors(name) )`)
+    .order('submitted_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export function getStudentCheckinLink(studentToken) {
+  const base = window.location.origin + window.location.pathname.split('#')[0].replace(/\/$/, '')
+  return `${base}/#/student-checkin?t=${studentToken}`
+}
