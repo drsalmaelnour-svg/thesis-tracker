@@ -7,6 +7,8 @@ import EmailCenter from './pages/EmailCenter'
 import Reminders from './pages/Reminders'
 import Settings from './pages/Settings'
 import Reports from './pages/Reports'
+import SupervisorCheckins from './pages/SupervisorCheckins'
+import SupervisorRespond from './pages/SupervisorRespond'
 import Respond from './pages/Respond'
 
 function Layout({ children }) {
@@ -26,6 +28,7 @@ export default function App() {
       <Routes>
         {/* Public response route — no sidebar */}
         <Route path="/respond" element={<Respond />} />
+        <Route path="/supervisor-respond" element={<SupervisorRespond />} />
 
         {/* App routes — with sidebar */}
         <Route path="/" element={<Layout><Dashboard /></Layout>} />
@@ -34,6 +37,7 @@ export default function App() {
         <Route path="/emails" element={<Layout><EmailCenter /></Layout>} />
         <Route path="/reminders" element={<Layout><Reminders /></Layout>} />
         <Route path="/reports"  element={<Layout><Reports /></Layout>} />
+        <Route path="/supervisor-checkins" element={<Layout><SupervisorCheckins /></Layout>} />
         <Route path="/settings" element={<Layout><Settings /></Layout>} />
       </Routes>
     </HashRouter>
