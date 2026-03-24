@@ -1,160 +1,111 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import {
   FileText, Download, Printer, FileSpreadsheet, Loader2,
-  Users, AlertCircle, GraduationCap, CheckCircle2, User,
-  ClipboardList, Filter, ChevronDown, RefreshCw, Mail,
-  Send, Clock, MessageSquare, Bell, Activity
+  Filter, ChevronDown, RefreshCw, Mail, Send
 } from 'lucide-react'
 import { getStudentsWithProgress, getSupervisorCheckins, MILESTONES } from '../lib/supabase'
 import { sendStudentEmail } from '../lib/emailService'
-import { formatDistanceToNow } from 'date-fns'
 
-const SIGNATURE = { name: 'Dr. Salma Elnour', title: 'Thesis Coordinator' }
+// ── Constants ─────────────────────────────────────────────────────────────────
+const INSTITUTION = 'Gulf Medical University'
+const SIGNATURE   = { name: 'Dr. Salma Elnour', title: 'Thesis Coordinator' }
 
-const GROUP_MILESTONE_LIST = [
+const FIELD_LABELS = {
+  orcid_id:         'ORCID iD',
+  proposal_title:   'Proposal Title',
+  irb_number:       'IRB Reference Number',
+  approval_date:    'IRB Approval Date',
+  defense_date:     'Defense Date',
+  defense_time:     'Preferred Time',
+  final_title:      'Final Thesis Title',
+  submission_date:  'Submission Date',
+  submission_notes: 'Submission Notes',
+  committee_notes:  'Committee Notes',
+  progress_summary: 'Progress Summary',
+}
+const fLabel = k => FIELD_LABELS[k] || k.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())
+
+const ACT_LABELS = {
+  email:     'Email Sent',
+  reminder:  'Reminder Sent',
+  milestone: 'Milestone Updated',
+  checkin:   'Check-in Submitted',
+  note:      'Note Added',
+}
+
+const GROUP_MILESTONES = [
   { id: 'proposal_defense', name: 'Proposal Defense' },
   { id: 'progress_1',       name: 'First Progress Report' },
   { id: 'progress_2',       name: 'Second Progress Report' },
 ]
 
-const FIELD_LABELS = {
-  orcid_id:        'ORCID iD',
-  proposal_title:  'Proposal Title',
-  irb_number:      'IRB Reference Number',
-  approval_date:   'IRB Approval Date',
-  defense_date:    'Defense Date',
-  defense_time:    'Preferred Time',
-  final_title:     'Final Thesis Title',
-  submission_date: 'Submission Date',
-  submission_notes:'Submission Notes',
-  committee_notes: 'Committee Notes',
-  progress_summary:'Progress Summary',
-}
-function fieldLabel(key) {
-  return FIELD_LABELS[key] || key.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())
-}
+const REPORT_GROUPS = [
+  {
+    label: 'Student Reports',
+    options: [
+      { id: 'full_progress',    label: 'Full Progress Report' },
+      { id: 'overdue',          label: 'Overdue Students' },
+      { id: 'milestone_status', label: 'By Milestone — Student Responses' },
+      { id: 'groups',           label: 'Group Assignments' },
+      { id: 'individual',       label: 'Individual Student Report' },
+    ]
+  },
+  {
+    label: 'Supervisor Reports',
+    options: [
+      { id: 'supervisor_checkins', label: 'Supervisor Check-ins' },
+      { id: 'issues_only',         label: 'Issues & Actions Only' },
+    ]
+  },
+  {
+    label: 'Communication History',
+    options: [
+      { id: 'comm_student', label: 'Per Student' },
+      { id: 'comm_cohort',  label: 'Per Cohort' },
+    ]
+  },
+]
 
-const ACTIVITY_TYPE_LABELS = {
-  email:     '📧 Email Sent',
-  reminder:  '🔔 Reminder Sent',
-  milestone: '✅ Milestone Updated',
-  checkin:   '📋 Check-in',
-  note:      '📝 Note Added',
-}
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}) : ''
+const fmtShort= d => d ? new Date(d).toLocaleDateString('en-GB') : ''
+const fmtTime = d => d ? new Date(d).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : ''
 
-// ── Script loader ─────────────────────────────────────────────────────────────
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return }
-    const s = document.createElement('script')
-    s.src = src; s.onload = resolve; s.onerror = reject
-    document.head.appendChild(s)
-  })
-}
-
-// ── Export helpers ────────────────────────────────────────────────────────────
-function downloadCSV(rows, filename) {
-  if (!rows.length) return
-  const headers = Object.keys(rows[0])
-  const csv = [
-    headers.join(','),
-    ...rows.map(r =>
-      headers.map(h => {
-        const v = r[h] == null ? '' : String(r[h])
-        return v.includes(',') || v.includes('"') || v.includes('\n')
-          ? `"${v.replace(/"/g,'""')}"` : v
-      }).join(',')
-    )
-  ].join('\n')
-  const blob = new Blob(['\uFEFF'+csv], { type: 'text/csv;charset=utf-8' })
-  triggerDownload(blob, filename)
-}
-
-async function downloadExcel(rows, filename, sheetName) {
-  await loadScript('https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js')
-  const XLSX = window.XLSX
-  const ws = XLSX.utils.json_to_sheet(rows)
-  ws['!cols'] = Object.keys(rows[0]||{}).map(k=>({ wch: Math.max(k.length+2, 16) }))
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0,31))
-  XLSX.writeFile(wb, filename)
-}
-
-async function downloadPDF(title, rows, filename, subtitle='') {
-  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
-  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js')
-  const jsPDF = window.jspdf?.jsPDF || window.jsPDF
-  if (!jsPDF) throw new Error('PDF library failed to load')
-  const isLandscape = rows.length && Object.keys(rows[0]).length > 6
-  const doc = new jsPDF({ orientation: isLandscape ? 'landscape' : 'portrait' })
-  const pageW = doc.internal.pageSize.getWidth()
-  // Header
-  doc.setFillColor(30,58,95); doc.rect(0,0,pageW,38,'F')
-  doc.setTextColor(212,168,67); doc.setFontSize(9); doc.setFont('helvetica','bold')
-  doc.text('THESIS COORDINATION SYSTEM', 14, 12)
-  doc.setTextColor(255,255,255); doc.setFontSize(15)
-  doc.text(title, 14, 24)
-  if (subtitle) {
-    doc.setFontSize(9); doc.setTextColor(180,200,230)
-    doc.text(subtitle, 14, 33)
-  }
-  doc.setFontSize(8); doc.setTextColor(180,200,230)
-  doc.text(`Generated: ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}`, pageW-14, 33, {align:'right'})
-  if (rows.length) {
-    doc.autoTable({
-      head: [Object.keys(rows[0])],
-      body: rows.map(r=>Object.values(r).map(v=>v==null?'':String(v))),
-      startY: 44,
-      styles: { fontSize: 8, cellPadding: 3, overflow: 'linebreak' },
-      headStyles: { fillColor: [30,58,95], textColor: 255, fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [245,248,252] },
-      margin: { left: 14, right: 14 },
-    })
-  }
-  // Signature
-  const pageH = doc.internal.pageSize.getHeight()
-  const sigY = pageH - 28
-  doc.setDrawColor(200,200,200); doc.line(14, sigY, 75, sigY)
-  doc.setTextColor(30,58,95); doc.setFontSize(9); doc.setFont('helvetica','bold')
-  doc.text(SIGNATURE.name, 14, sigY+6)
-  doc.setFont('helvetica','normal'); doc.setTextColor(100,100,100); doc.setFontSize(8)
-  doc.text(SIGNATURE.title, 14, sigY+12)
-  doc.save(filename)
-}
-
-function triggerDownload(blob, filename) {
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob); a.download = filename; a.click()
-}
-
-// ── Report builders ───────────────────────────────────────────────────────────
 function extractResponses(sm) {
   if (!sm?.response_data) return {}
   const out = {}
   for (const [k,v] of Object.entries(sm.response_data)) {
-    if (v && k !== 'group') out[fieldLabel(k)] = v
+    if (v && k !== 'group') out[fLabel(k)] = String(v)
   }
   return out
 }
 
+// Strict cohort filter — number vs string safe
+function filterByCohort(students, cohort) {
+  if (cohort === 'all') return students
+  return students.filter(s => Number(s.enrollment_year) === Number(cohort))
+}
+
+// ── Report builders ───────────────────────────────────────────────────────────
 function buildFullProgress(students) {
   return students.map(s => {
     const row = {
       'Reg No':     s.student_id || '',
-      'Name':       s.name,
+      'Student Name': s.name,
       'Email':      s.email,
       'Cohort':     s.enrollment_year || '',
       'Program':    s.program || '',
-      'Supervisor': s.supervisors?.name || '',
+      'Supervisor': s.supervisors?.name || 'Unassigned',
     }
     for (const m of MILESTONES) {
       const sm = (s.student_milestones||[]).find(x=>x.milestone_id===m.id)
-      row[m.name] = sm?.status==='completed'
-        ? `✓ ${sm.completed_at ? new Date(sm.completed_at).toLocaleDateString('en-GB') : ''}`
-        : sm?.status ? sm.status.charAt(0).toUpperCase()+sm.status.slice(1) : 'Pending'
+      row[m.name] = sm?.status === 'completed'
+        ? `Completed — ${fmtShort(sm.completed_at)}`
+        : sm?.status ? sm.status.charAt(0).toUpperCase()+sm.status.slice(1)
+        : 'Pending'
     }
     const done = (s.student_milestones||[]).filter(m=>m.status==='completed').length
-    row['Progress'] = `${done}/${MILESTONES.length} (${Math.round(done/MILESTONES.length*100)}%)`
+    row['Overall Progress'] = `${done} of ${MILESTONES.length} (${Math.round(done/MILESTONES.length*100)}%)`
     return row
   })
 }
@@ -165,34 +116,44 @@ function buildOverdue(students) {
     for (const sm of (s.student_milestones||[]).filter(m=>m.status==='overdue')) {
       const m = MILESTONES.find(x=>x.id===sm.milestone_id)
       rows.push({
-        'Reg No':     s.student_id || '',
-        'Name':       s.name,
-        'Email':      s.email,
-        'Cohort':     s.enrollment_year || '',
-        'Supervisor': s.supervisors?.name || '',
-        'Milestone':  m?.name || sm.milestone_id,
-        'Due Date':   sm.due_date ? new Date(sm.due_date).toLocaleDateString('en-GB') : 'Not set',
+        'Reg No':      s.student_id || '',
+        'Student Name':s.name,
+        'Email':       s.email,
+        'Cohort':      s.enrollment_year || '',
+        'Supervisor':  s.supervisors?.name || '',
+        'Milestone':   m?.name || sm.milestone_id,
+        'Due Date':    sm.due_date ? fmtDate(sm.due_date) : 'No deadline set',
       })
     }
   }
   return rows
 }
 
-function buildMilestoneStatus(students, milestoneId) {
+function buildMilestoneStatus(students, milestoneId, milestoneGroupsData) {
   const needsGroup = ['proposal_defense','progress_1','progress_2'].includes(milestoneId)
+  const groupMap = {}
+  for (const g of (milestoneGroupsData[milestoneId]||[])) groupMap[g.group_name] = g
+
   return students.map(s => {
     const sm     = (s.student_milestones||[]).find(x=>x.milestone_id===milestoneId)
     const status = sm?.status || 'pending'
     const row = {
-      'Reg No':     s.student_id || '',
-      'Name':       s.name,
-      'Email':      s.email,
-      'Cohort':     s.enrollment_year || '',
-      'Supervisor': s.supervisors?.name || '',
-      'Status':     status.charAt(0).toUpperCase()+status.slice(1),
+      'Reg No':      s.student_id || '',
+      'Student Name':s.name,
+      'Email':       s.email,
+      'Cohort':      s.enrollment_year || '',
+      'Supervisor':  s.supervisors?.name || '',
+      'Status':      status.charAt(0).toUpperCase()+status.slice(1),
     }
-    if (needsGroup) row['Group'] = sm?.group_name || ''
-    // Actual response data — not dates
+    // Group info from coordinator settings
+    if (needsGroup && sm?.group_name) {
+      const g = groupMap[sm.group_name] || {}
+      row['Group']        = `Group ${sm.group_name}`
+      row['Session Date'] = g.date ? fmtDate(g.date) : ''
+      row['Time']         = g.time_slot || ''
+      row['Location']     = g.notes || ''
+    }
+    // Actual submitted response data
     Object.assign(row, extractResponses(sm))
     return row
   })
@@ -201,23 +162,26 @@ function buildMilestoneStatus(students, milestoneId) {
 function buildGroups(students, milestoneId, milestoneGroupsData) {
   const groupMap = {}
   for (const g of (milestoneGroupsData[milestoneId]||[])) groupMap[g.group_name] = g
+  const milestoneName = MILESTONES.find(m=>m.id===milestoneId)?.name || milestoneId
+
   return students.map(s => {
     const sm        = (s.student_milestones||[]).find(x=>x.milestone_id===milestoneId)
     const groupName = sm?.group_name || ''
-    const groupInfo = groupMap[groupName] || {}
+    const g         = groupMap[groupName] || {}
     return {
-      'Reg No':     s.student_id || '',
-      'Name':       s.name,
-      'Email':      s.email,
-      'Cohort':     s.enrollment_year || '',
-      'Supervisor': s.supervisors?.name || '',
-      'Group':      groupName || 'Not selected',
-      'Session Date': groupInfo.date ? new Date(groupInfo.date).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}) : '',
-      'Time':       groupInfo.time_slot || '',
-      'Location':   groupInfo.notes || '',
-      'Status':     sm?.status ? sm.status.charAt(0).toUpperCase()+sm.status.slice(1) : 'Pending',
+      'Reg No':       s.student_id || '',
+      'Student Name': s.name,
+      'Email':        s.email,
+      'Cohort':       s.enrollment_year || '',
+      'Supervisor':   s.supervisors?.name || '',
+      'Milestone':    milestoneName,
+      'Group':        groupName ? `Group ${groupName}` : 'Not assigned',
+      'Session Date': g.date ? fmtDate(g.date) : '',
+      'Time':         g.time_slot || '',
+      'Location':     g.notes || '',
+      'Status':       sm?.status ? sm.status.charAt(0).toUpperCase()+sm.status.slice(1) : 'Pending',
     }
-  }).sort((a,b)=>a.Group.localeCompare(b.Group))
+  }).sort((a,b) => a.Group.localeCompare(b.Group))
 }
 
 function buildIndividual(student) {
@@ -227,8 +191,8 @@ function buildIndividual(student) {
     const row = {
       'Milestone':      m.name,
       'Status':         status.charAt(0).toUpperCase()+status.slice(1),
-      'Group':          sm?.group_name || '',
-      'Completed Date': sm?.completed_at ? new Date(sm.completed_at).toLocaleDateString('en-GB') : '',
+      'Group':          sm?.group_name ? `Group ${sm.group_name}` : '',
+      'Completed Date': sm?.completed_at ? fmtDate(sm.completed_at) : '',
     }
     Object.assign(row, extractResponses(sm))
     return row
@@ -237,134 +201,232 @@ function buildIndividual(student) {
 
 function buildSupervisorCheckins(checkins) {
   return checkins.map(c => ({
-    'Supervisor':          c.supervisors?.name || '',
-    'Student':             c.students?.name    || '',
-    'Reg No':              c.students?.student_id || '',
-    'Engagement Status':   c.engagement_status==='on_track' ? '🟢 On Track' :
-                           c.engagement_status==='concerns' ? '🟡 Concerns' : '🔴 Urgent',
-    'Issue Type':          c.issue_type        || '',
-    'Issue Description':   c.issue_description || '',
-    'Recommended Action':  c.recommended_action|| '',
-    'Date Submitted':      new Date(c.submitted_at).toLocaleDateString('en-GB'),
+    'Supervisor':         c.supervisors?.name || '',
+    'Student Name':       c.students?.name    || '',
+    'Reg No':             c.students?.student_id || '',
+    'Engagement Status':  c.engagement_status==='on_track' ? 'On Track'
+                        : c.engagement_status==='concerns'  ? 'Concerns'
+                        :                                     'Urgent',
+    'Issue Type':         c.issue_type        || '',
+    'Issue Description':  c.issue_description || '',
+    'Recommended Action': c.recommended_action|| '',
+    'Date Submitted':     fmtDate(c.submitted_at),
   }))
 }
 
 function buildIssuesOnly(checkins) {
-  return checkins.filter(c=>c.engagement_status!=='on_track').map(c => ({
-    'Supervisor':          c.supervisors?.name || '',
-    'Student':             c.students?.name    || '',
-    'Reg No':              c.students?.student_id || '',
-    'Status':              c.engagement_status==='concerns' ? '🟡 Concerns' : '🔴 Urgent',
-    'Issue Type':          c.issue_type        || '',
-    'Issue Description':   c.issue_description || '',
-    'Recommended Action':  c.recommended_action|| '',
-    'Date Submitted':      new Date(c.submitted_at).toLocaleDateString('en-GB'),
-  }))
+  return checkins
+    .filter(c=>c.engagement_status!=='on_track')
+    .map(c => ({
+      'Supervisor':         c.supervisors?.name || '',
+      'Student Name':       c.students?.name    || '',
+      'Reg No':             c.students?.student_id || '',
+      'Status':             c.engagement_status==='concerns' ? 'Concerns' : 'Urgent',
+      'Issue Type':         c.issue_type        || '',
+      'Issue Description':  c.issue_description || '',
+      'Recommended Action': c.recommended_action|| '',
+      'Date Submitted':     fmtDate(c.submitted_at),
+    }))
 }
 
-// Communication history builders
-function buildCommHistoryAllStudents(students, activityByStudent) {
+function buildCommStudent(student, activities) {
+  return activities.map(a => ({
+    'Date':        fmtShort(a.created_at),
+    'Time':        fmtTime(a.created_at),
+    'Type':        ACT_LABELS[a.type] || a.type,
+    'Description': a.description,
+  })).sort((a,b)=>new Date(a.Date)-new Date(b.Date))
+}
+
+function buildCommCohort(students, activityByStudent) {
   const rows = []
   for (const s of students) {
-    const activities = activityByStudent[s.id] || []
-    for (const a of activities) {
+    for (const a of (activityByStudent[s.id]||[])) {
       rows.push({
-        'Reg No':     s.student_id || '',
-        'Student':    s.name,
-        'Cohort':     s.enrollment_year || '',
-        'Supervisor': s.supervisors?.name || '',
-        'Type':       ACTIVITY_TYPE_LABELS[a.type] || a.type,
-        'Description':a.description,
-        'Date':       new Date(a.created_at).toLocaleDateString('en-GB'),
-        'Time':       new Date(a.created_at).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'}),
+        'Date':          fmtShort(a.created_at),
+        'Time':          fmtTime(a.created_at),
+        'Reg No':        s.student_id || '',
+        'Student Name':  s.name,
+        'Supervisor':    s.supervisors?.name || '',
+        'Type':          ACT_LABELS[a.type] || a.type,
+        'Description':   a.description,
       })
     }
   }
-  return rows.sort((a,b)=>new Date(b.Date)-new Date(a.Date))
+  return rows.sort((a,b)=>new Date(a.Date+' '+a.Time)-new Date(b.Date+' '+b.Time))
 }
 
-function buildCommHistoryPerStudent(student, activities, groupBy) {
-  if (groupBy === 'milestone') {
-    const rows = []
-    for (const m of MILESTONES) {
-      const mActivities = activities.filter(a =>
-        a.description.toLowerCase().includes(m.name.toLowerCase()) ||
-        (a.metadata?.milestoneId === m.id)
-      )
-      for (const a of mActivities) {
-        rows.push({
-          'Milestone':   m.name,
-          'Type':        ACTIVITY_TYPE_LABELS[a.type] || a.type,
-          'Description': a.description,
-          'Date':        new Date(a.created_at).toLocaleDateString('en-GB'),
-          'Time':        new Date(a.created_at).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'}),
-        })
-      }
-    }
-    return rows
-  } else {
-    return activities.map(a => ({
-      'Type':        ACTIVITY_TYPE_LABELS[a.type] || a.type,
-      'Description': a.description,
-      'Date':        new Date(a.created_at).toLocaleDateString('en-GB'),
-      'Time':        new Date(a.created_at).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'}),
-    })).sort((a,b)=>new Date(a.Date+' '+a.Time)-new Date(b.Date+' '+b.Time))
+// ── Script loader ─────────────────────────────────────────────────────────────
+function loadScript(src) {
+  return new Promise((res,rej) => {
+    if (document.querySelector(`script[src="${src}"]`)) { res(); return }
+    const s = document.createElement('script')
+    s.src = src; s.onload = res; s.onerror = rej
+    document.head.appendChild(s)
+  })
+}
+
+// ── Export helpers ────────────────────────────────────────────────────────────
+function downloadCSV(rows, filename) {
+  const headers = Object.keys(rows[0])
+  const csv = [
+    headers.join(','),
+    ...rows.map(r => headers.map(h => {
+      const v = r[h]==null ? '' : String(r[h])
+      return v.includes(',') || v.includes('"') || v.includes('\n')
+        ? `"${v.replace(/"/g,'""')}"` : v
+    }).join(','))
+  ].join('\n')
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'}))
+  a.download = filename; a.click()
+}
+
+async function downloadExcel(rows, filename, sheetName) {
+  await loadScript('https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js')
+  const XLSX = window.XLSX
+  const ws = XLSX.utils.json_to_sheet(rows)
+  ws['!cols'] = Object.keys(rows[0]).map(k=>({ wch: Math.max(k.length+2, 18) }))
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0,31))
+  XLSX.writeFile(wb, filename)
+}
+
+async function downloadPDF(title, subtitle, rows, filename) {
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js')
+  const jsPDF = window.jspdf?.jsPDF || window.jsPDF
+  if (!jsPDF) throw new Error('PDF library failed to load')
+
+  const landscape = rows.length && Object.keys(rows[0]).length > 6
+  const doc  = new jsPDF({ orientation: landscape ? 'landscape' : 'portrait', unit: 'mm' })
+  const pageW = doc.internal.pageSize.getWidth()
+  const pageH = doc.internal.pageSize.getHeight()
+
+  // ── Professional header ───────────────────────────────────────────────────
+  // Navy background bar
+  doc.setFillColor(30, 58, 95)
+  doc.rect(0, 0, pageW, 44, 'F')
+
+  // Gold accent line
+  doc.setFillColor(212, 168, 67)
+  doc.rect(0, 44, pageW, 1.5, 'F')
+
+  // Institution name
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8)
+  doc.setTextColor(212, 168, 67)
+  doc.text(INSTITUTION.toUpperCase(), 14, 11)
+
+  // Report title
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(16)
+  doc.setTextColor(255, 255, 255)
+  doc.text(title, 14, 24)
+
+  // Subtitle (cohort / student name)
+  if (subtitle) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(180, 210, 240)
+    doc.text(subtitle, 14, 33)
   }
-}
 
-// ── Report configs ────────────────────────────────────────────────────────────
-const REPORT_TYPES = [
-  {
-    group: 'Student Reports',
-    items: [
-      { id: 'full_progress',    icon: GraduationCap, label: 'Full Progress',       desc: 'All students × all milestones with completion status' },
-      { id: 'overdue',          icon: AlertCircle,   label: 'Overdue Students',    desc: 'Students with overdue milestones' },
-      { id: 'milestone_status', icon: CheckCircle2,  label: 'By Milestone',        desc: 'All students for one milestone with their actual submitted responses' },
-      { id: 'groups',           icon: Users,         label: 'Group Assignments',   desc: 'Group A/B lists with session dates and locations' },
-      { id: 'individual',       icon: User,          label: 'Individual Student',  desc: 'Complete record for one student' },
-    ]
-  },
-  {
-    group: 'Supervisor Reports',
-    items: [
-      { id: 'supervisor_checkins', icon: ClipboardList, label: 'All Check-ins',    desc: 'All supervisor responses with engagement details' },
-      { id: 'issues_only',         icon: AlertCircle,   label: 'Issues & Actions', desc: 'Only 🟡🔴 flagged students with issue details and recommended actions' },
-    ]
-  },
-  {
-    group: 'Communication History',
-    items: [
-      { id: 'comm_all',      icon: Activity, label: 'All Students',     desc: 'Complete communication log across all students' },
-      { id: 'comm_student',  icon: MessageSquare, label: 'Per Student', desc: 'Full communication timeline for one student' },
-    ]
-  },
-]
+  // Date top right
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.setTextColor(180, 210, 240)
+  const dateStr = `Generated: ${fmtDate(new Date())}`
+  doc.text(dateStr, pageW - 14, 11, { align: 'right' })
+
+  // Confidential tag top right
+  doc.setFontSize(7)
+  doc.setTextColor(212, 168, 67)
+  doc.text('CONFIDENTIAL', pageW - 14, 33, { align: 'right' })
+
+  // ── Table ─────────────────────────────────────────────────────────────────
+  if (rows.length) {
+    doc.autoTable({
+      head: [Object.keys(rows[0])],
+      body: rows.map(r => Object.values(r).map(v => v==null ? '' : String(v))),
+      startY: 50,
+      styles: {
+        fontSize: 8,
+        cellPadding: 3,
+        overflow: 'linebreak',
+        textColor: [40, 40, 40],
+      },
+      headStyles: {
+        fillColor:  [30, 58, 95],
+        textColor:  [255, 255, 255],
+        fontStyle:  'bold',
+        fontSize:   8,
+      },
+      alternateRowStyles: { fillColor: [245, 248, 252] },
+      margin: { left: 14, right: 14 },
+      didDrawPage: (data) => {
+        // Page number footer
+        doc.setFontSize(7)
+        doc.setTextColor(150, 150, 150)
+        doc.text(
+          `Page ${data.pageNumber}`,
+          pageW / 2, pageH - 8,
+          { align: 'center' }
+        )
+      }
+    })
+  } else {
+    doc.setTextColor(120,120,120)
+    doc.setFontSize(10)
+    doc.text('No data found for this report.', 14, 55)
+  }
+
+  // ── Signature footer ──────────────────────────────────────────────────────
+  const finalY = doc.lastAutoTable?.finalY || 60
+  const sigY   = Math.min(finalY + 16, pageH - 28)
+
+  doc.setDrawColor(212, 168, 67)
+  doc.setLineWidth(0.5)
+  doc.line(14, sigY, 80, sigY)
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9)
+  doc.setTextColor(30, 58, 95)
+  doc.text(SIGNATURE.name, 14, sigY + 6)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.setTextColor(100, 100, 100)
+  doc.text(SIGNATURE.title, 14, sigY + 12)
+  doc.text(INSTITUTION, 14, sigY + 18)
+
+  doc.save(filename)
+}
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function Reports() {
-  const [students, setStudents]                   = useState([])
-  const [checkins, setCheckins]                   = useState([])
-  const [milestoneGroupsData, setMilestoneGroupsData] = useState({})
-  const [activityByStudent, setActivityByStudent] = useState({})
-  const [loading, setLoading]                     = useState(true)
-  const [generating, setGenerating]               = useState(false)
+  const [students,         setStudents]         = useState([])
+  const [checkins,         setCheckins]         = useState([])
+  const [milGroupsData,    setMilGroupsData]    = useState({})
+  const [actByStudent,     setActByStudent]     = useState({})
+  const [loading,          setLoading]          = useState(true)
+  const [generating,       setGenerating]       = useState(false)
 
-  // Filters
-  const [reportType, setReportType]           = useState('full_progress')
-  const [milestoneFilter, setMilestoneFilter] = useState('orcid')
-  const [groupMilestone, setGroupMilestone]   = useState('proposal_defense')
-  const [selectedStudent, setSelectedStudent] = useState('')
-  const [cohortFilter, setCohortFilter]       = useState('all')
-  const [commGroupBy, setCommGroupBy]         = useState('chronological') // 'chronological' | 'milestone'
+  // Filters & selectors
+  const [reportType,       setReportType]       = useState('full_progress')
+  const [cohortFilter,     setCohortFilter]     = useState('all')
+  const [milFilter,        setMilFilter]        = useState('orcid')
+  const [groupMil,         setGroupMil]         = useState('proposal_defense')
+  const [selStudent,       setSelStudent]       = useState('')
 
-  // Email sending state
-  const [showEmailSend, setShowEmailSend]   = useState(false)
-  const [emailTo, setEmailTo]               = useState('')
-  const [emailSending, setEmailSending]     = useState(false)
-  const [emailResult, setEmailResult]       = useState(null)
+  // Email send
+  const [emailTo,          setEmailTo]          = useState('')
+  const [emailSending,     setEmailSending]     = useState(false)
+  const [emailResult,      setEmailResult]      = useState(null)
+  const [showEmail,        setShowEmail]        = useState(false)
 
   useEffect(() => {
-    async function loadAll() {
+    async function load() {
       try {
         const { supabase } = await import('../lib/supabase')
         const [studs, chks, grps] = await Promise.all([
@@ -374,127 +436,125 @@ export default function Reports() {
         ])
         setStudents(studs)
         setCheckins(chks)
-        if (studs.length) setSelectedStudent(studs[0].id)
+        if (studs.length) setSelStudent(studs[0].id)
 
-        // Group milestone groups data
-        const grouped = {}
+        const gMap = {}
         for (const g of (grps.data||[])) {
-          if (!grouped[g.milestone_id]) grouped[g.milestone_id] = []
-          grouped[g.milestone_id].push(g)
+          if (!gMap[g.milestone_id]) gMap[g.milestone_id] = []
+          gMap[g.milestone_id].push(g)
         }
-        setMilestoneGroupsData(grouped)
+        setMilGroupsData(gMap)
 
-        // Load activity logs for all students
-        const actMap = {}
+        // Load all activity logs
+        const aMap = {}
         for (const s of studs) {
           const { data: acts } = await supabase
-            .from('activity_log').select('*').eq('student_id', s.id).order('created_at', {ascending: false})
-          actMap[s.id] = acts || []
+            .from('activity_log')
+            .select('*')
+            .eq('student_id', s.id)
+            .order('created_at', { ascending: true })
+          aMap[s.id] = acts || []
         }
-        setActivityByStudent(actMap)
+        setActByStudent(aMap)
       } catch(e) { console.error(e) }
       finally { setLoading(false) }
     }
-    loadAll()
+    load()
   }, [])
 
-  const cohortYears = [...new Set(students.map(s=>s.enrollment_year).filter(Boolean))].sort((a,b)=>b-a)
-
-  const filteredStudents = cohortFilter==='all'
-    ? students
-    : students.filter(s=>String(s.enrollment_year)===String(cohortFilter))
-
-  const filteredCheckins = cohortFilter==='all'
-    ? checkins
-    : checkins.filter(c=>{
-        const stu = students.find(s=>s.id===c.student_id)
-        return String(stu?.enrollment_year)===String(cohortFilter)
-      })
+  // Strict cohort filtering
+  const cohortYears     = [...new Set(students.map(s=>s.enrollment_year).filter(Boolean))].sort((a,b)=>b-a)
+  const filteredStudents = filterByCohort(students, cohortFilter)
+  const filteredCheckins = cohortFilter==='all' ? checkins
+    : checkins.filter(c => Number(students.find(s=>s.id===c.student_id)?.enrollment_year) === Number(cohortFilter))
 
   function getRows() {
     switch(reportType) {
       case 'full_progress':       return buildFullProgress(filteredStudents)
       case 'overdue':             return buildOverdue(filteredStudents)
-      case 'groups':              return buildGroups(filteredStudents, groupMilestone, milestoneGroupsData)
-      case 'milestone_status':    return buildMilestoneStatus(filteredStudents, milestoneFilter)
+      case 'milestone_status':    return buildMilestoneStatus(filteredStudents, milFilter, milGroupsData)
+      case 'groups':              return buildGroups(filteredStudents, groupMil, milGroupsData)
       case 'individual': {
-        const s = students.find(x=>x.id===selectedStudent)
+        const s = students.find(x=>x.id===selStudent)
         return s ? buildIndividual(s) : []
       }
       case 'supervisor_checkins': return buildSupervisorCheckins(filteredCheckins)
       case 'issues_only':         return buildIssuesOnly(filteredCheckins)
-      case 'comm_all':
-        return buildCommHistoryAllStudents(filteredStudents, activityByStudent)
       case 'comm_student': {
-        const s = students.find(x=>x.id===selectedStudent)
-        return s ? buildCommHistoryPerStudent(s, activityByStudent[s.id]||[], commGroupBy) : []
+        const s = students.find(x=>x.id===selStudent)
+        return s ? buildCommStudent(s, actByStudent[s.id]||[]) : []
       }
+      case 'comm_cohort':
+        return buildCommCohort(filteredStudents, actByStudent)
       default: return []
     }
   }
 
   function getTitle() {
-    const cohortSuffix = cohortFilter!=='all' ? ` — ${cohortFilter} Cohort` : ''
+    const c = cohortFilter!=='all' ? `${cohortFilter} Cohort` : 'All Cohorts'
     switch(reportType) {
-      case 'full_progress':       return `Full Student Progress Report${cohortSuffix}`
-      case 'overdue':             return `Overdue Students Report${cohortSuffix}`
-      case 'groups':              return `Group Assignments — ${GROUP_MILESTONE_LIST.find(m=>m.id===groupMilestone)?.name}${cohortSuffix}`
-      case 'milestone_status':    return `${MILESTONES.find(m=>m.id===milestoneFilter)?.name} — Student Responses${cohortSuffix}`
-      case 'individual':          return `Individual Report — ${students.find(s=>s.id===selectedStudent)?.name||''}`
-      case 'supervisor_checkins': return `Supervisor Check-in Reports${cohortSuffix}`
-      case 'issues_only':         return `Student Issues & Actions${cohortSuffix}`
-      case 'comm_all':            return `Communication History — All Students${cohortSuffix}`
-      case 'comm_student':        return `Communication History — ${students.find(s=>s.id===selectedStudent)?.name||''}`
+      case 'full_progress':       return 'Full Student Progress Report'
+      case 'overdue':             return 'Overdue Students Report'
+      case 'groups':              return `Group Assignments — ${GROUP_MILESTONES.find(m=>m.id===groupMil)?.name}`
+      case 'milestone_status':    return `${MILESTONES.find(m=>m.id===milFilter)?.name} — Student Responses`
+      case 'individual':          return `Individual Report — ${students.find(s=>s.id===selStudent)?.name||''}`
+      case 'supervisor_checkins': return 'Supervisor Check-in Report'
+      case 'issues_only':         return 'Student Issues & Recommended Actions'
+      case 'comm_student':        return `Communication History — ${students.find(s=>s.id===selStudent)?.name||''}`
+      case 'comm_cohort':         return `Communication History — ${c}`
       default: return 'Report'
     }
   }
 
-  function fname(ext) {
-    return `thesis-${reportType}-${new Date().toISOString().slice(0,10)}.${ext}`
+  function getSubtitle() {
+    const parts = []
+    if (cohortFilter!=='all') parts.push(`${cohortFilter} Cohort`)
+    if (reportType==='individual'||reportType==='comm_student') {
+      const s = students.find(x=>x.id===selStudent)
+      if (s?.student_id) parts.push(`Reg No: ${s.student_id}`)
+    }
+    parts.push(`${filteredStudents.length} Students`)
+    return parts.join('  |  ')
   }
 
-  async function exportAs(format) {
+  function fname(ext) {
+    return `thesis-report-${reportType}-${new Date().toISOString().slice(0,10)}.${ext}`
+  }
+
+  async function exportAs(fmt) {
     setGenerating(true)
     try {
-      const rows  = getRows()
-      const title = getTitle()
-      const sub   = cohortFilter!=='all' ? `${cohortFilter} Cohort` : ''
-      if (!rows.length) { alert('No data to export for this report.'); setGenerating(false); return }
-      if (format==='csv')   downloadCSV(rows, fname('csv'))
-      if (format==='excel') await downloadExcel(rows, fname('xlsx'), title)
-      if (format==='pdf')   await downloadPDF(title, rows, fname('pdf'), sub)
-      if (format==='print') window.print()
-    } catch(e) {
-      console.error(e); alert('Export failed: '+(e.message||String(e)))
-    }
+      const rows = getRows()
+      if (!rows.length) { alert('No data to export.'); setGenerating(false); return }
+      if (fmt==='csv')   downloadCSV(rows, fname('csv'))
+      if (fmt==='excel') await downloadExcel(rows, fname('xlsx'), getTitle())
+      if (fmt==='pdf')   await downloadPDF(getTitle(), getSubtitle(), rows, fname('pdf'))
+      if (fmt==='print') window.print()
+    } catch(e) { alert('Export failed: '+(e.message||String(e))) }
     setGenerating(false)
   }
 
-  async function sendByEmail() {
+  async function sendReport() {
     if (!emailTo.trim()) return
     setEmailSending(true); setEmailResult(null)
     try {
-      const rows  = getRows()
-      const title = getTitle()
-      if (!rows.length) { setEmailResult({ ok: false, msg: 'No data to send.' }); setEmailSending(false); return }
-
-      // Build a plain text summary of the report
-      const headers = Object.keys(rows[0])
-      const summary = rows.slice(0,20).map((row,i) =>
-        headers.map(h => `${h}: ${row[h]||'—'}`).join(' | ')
+      const rows    = getRows()
+      const title   = getTitle()
+      const headers = rows.length ? Object.keys(rows[0]) : []
+      const preview = rows.slice(0,15).map(r =>
+        headers.map(h=>`${h}: ${r[h]||'—'}`).join('  |  ')
       ).join('\n')
-      const note = rows.length > 20 ? `\n\n... and ${rows.length-20} more records. Please export to Excel or PDF for the full report.` : ''
+      const more = rows.length>15 ? `\n\n(${rows.length-15} more records — please export to PDF or Excel for full report)` : ''
 
-      // Send via a dummy student object with the target email
       await sendStudentEmail({
-        student: { name: 'Coordinator', email: emailTo, token: '' },
+        student:     { name: 'Coordinator', email: emailTo, token: '' },
         milestoneId: null,
-        subject: title,
-        message: `Please find below the ${title}.\n\nGenerated: ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}\nTotal records: ${rows.length}\n\n${summary}${note}`,
+        subject:     `${title} — ${fmtDate(new Date())}`,
+        message:     `Please find below the ${title}.\n\nGenerated: ${fmtDate(new Date())}\nTotal Records: ${rows.length}\n\n${preview}${more}\n\n${SIGNATURE.name}\n${SIGNATURE.title}\n${INSTITUTION}`,
       })
       setEmailResult({ ok: true, msg: `Report sent to ${emailTo}` })
     } catch(e) {
-      setEmailResult({ ok: false, msg: 'Failed to send: '+e.message })
+      setEmailResult({ ok: false, msg: 'Failed to send. Please try again.' })
     }
     setEmailSending(false)
   }
@@ -505,11 +565,11 @@ export default function Reports() {
   return (
     <div className="p-8 space-y-6 fade-in">
 
-      {/* Header */}
+      {/* ── Page header ── */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-3xl font-semibold text-slate-100">Reports</h1>
-          <p className="text-navy-400 mt-1">Generate, export and share detailed reports</p>
+          <p className="text-navy-400 mt-1">Generate and export professional reports</p>
         </div>
         <button onClick={()=>window.location.reload()} className="btn-secondary">
           <RefreshCw size={15}/> Refresh
@@ -522,143 +582,126 @@ export default function Reports() {
         <div className="space-y-4">
 
           {/* Cohort filter */}
-          <div className="card p-4">
+          <div className="card p-5 border-gold-500/20">
             <div className="flex items-center gap-2 mb-3">
-              <Filter size={14} className="text-gold-400"/>
-              <h2 className="font-semibold text-slate-200 text-sm">Cohort</h2>
+              <Filter size={15} className="text-gold-400"/>
+              <h3 className="font-semibold text-slate-100 text-sm">Cohort</h3>
             </div>
             <div className="relative">
-              <select className="input text-sm appearance-none pr-7"
+              <select className="input text-sm appearance-none pr-7 bg-navy-900/80"
                 value={cohortFilter} onChange={e=>setCohortFilter(e.target.value)}>
                 <option value="all">All Cohorts</option>
-                {cohortYears.map(y=><option key={y} value={y}>{y} Cohort</option>)}
+                {cohortYears.map(y=>(
+                  <option key={y} value={y}>{y} Cohort — {filterByCohort(students,y).length} students</option>
+                ))}
               </select>
               <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-400 pointer-events-none"/>
             </div>
             {cohortFilter!=='all' && (
-              <p className="text-xs text-gold-400/70 mt-2">
-                {filteredStudents.length} student{filteredStudents.length!==1?'s':''}
-              </p>
+              <div className="mt-2.5 px-3 py-2 rounded-lg bg-gold-500/10 border border-gold-500/20">
+                <p className="text-xs text-gold-300 font-medium">
+                  {filteredStudents.length} student{filteredStudents.length!==1?'s':''} in {cohortFilter} cohort
+                </p>
+              </div>
             )}
           </div>
 
-          {/* Report types — dropdown */}
-          <div className="card p-4">
-            <h2 className="font-display font-semibold text-slate-100 mb-3 text-sm">Report Type</h2>
+          {/* Report type */}
+          <div className="card p-5">
+            <h3 className="font-semibold text-slate-100 text-sm mb-3">Report Type</h3>
             <div className="relative">
-              <select
-                className="input text-sm appearance-none pr-7"
-                value={reportType}
-                onChange={e => setReportType(e.target.value)}
-              >
-                {REPORT_TYPES.map(group => (
-                  <optgroup key={group.group} label={group.group}>
-                    {group.items.map(r => (
-                      <option key={r.id} value={r.id}>{r.label}</option>
+              <select className="input text-sm appearance-none pr-7 bg-navy-900/80"
+                value={reportType} onChange={e=>setReportType(e.target.value)}>
+                {REPORT_GROUPS.map(g=>(
+                  <optgroup key={g.label} label={g.label}>
+                    {g.options.map(o=>(
+                      <option key={o.id} value={o.id}>{o.label}</option>
                     ))}
                   </optgroup>
                 ))}
               </select>
               <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-400 pointer-events-none"/>
             </div>
-            {/* Description of selected report */}
-            {(() => {
-              const current = REPORT_TYPES.flatMap(g=>g.items).find(r=>r.id===reportType)
-              return current ? (
-                <p className="text-xs text-navy-500 mt-2 leading-relaxed">{current.desc}</p>
-              ) : null
-            })()}
           </div>
 
-          {/* Contextual filters */}
-          {(reportType==='milestone_status'||reportType==='groups'||reportType==='individual'||reportType==='comm_student') && (
-            <div className="card p-4 space-y-3">
-              <h2 className="font-display font-semibold text-slate-100 text-sm">Filter</h2>
-              {reportType==='milestone_status' && (
-                <div>
-                  <label className="block text-xs text-navy-400 mb-1.5">Milestone</label>
-                  <div className="relative">
-                    <select className="input text-sm appearance-none pr-7" value={milestoneFilter} onChange={e=>setMilestoneFilter(e.target.value)}>
-                      {MILESTONES.map(m=><option key={m.id} value={m.id}>{m.icon} {m.name}</option>)}
-                    </select>
-                    <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-400 pointer-events-none"/>
-                  </div>
-                </div>
-              )}
-              {reportType==='groups' && (
-                <div>
-                  <label className="block text-xs text-navy-400 mb-1.5">Milestone</label>
-                  <div className="relative">
-                    <select className="input text-sm appearance-none pr-7" value={groupMilestone} onChange={e=>setGroupMilestone(e.target.value)}>
-                      {GROUP_MILESTONE_LIST.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
-                    </select>
-                    <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-400 pointer-events-none"/>
-                  </div>
-                </div>
-              )}
-              {(reportType==='individual'||reportType==='comm_student') && (
-                <div>
-                  <label className="block text-xs text-navy-400 mb-1.5">Student</label>
-                  <div className="relative">
-                    <select className="input text-sm appearance-none pr-7" value={selectedStudent} onChange={e=>setSelectedStudent(e.target.value)}>
-                      {filteredStudents.map(s=><option key={s.id} value={s.id}>{s.name} ({s.student_id||s.email})</option>)}
-                    </select>
-                    <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-400 pointer-events-none"/>
-                  </div>
-                </div>
-              )}
-              {reportType==='comm_student' && (
-                <div>
-                  <label className="block text-xs text-navy-400 mb-1.5">Group By</label>
-                  <div className="flex gap-2">
-                    {[['chronological','Chronological'],['milestone','By Milestone']].map(([v,l])=>(
-                      <button key={v} onClick={()=>setCommGroupBy(v)}
-                        className={`flex-1 px-2 py-1.5 rounded-xl text-xs font-medium border transition-all ${
-                          commGroupBy===v ? 'border-gold-500/40 bg-gold-500/10 text-gold-300' : 'border-navy-600/50 text-navy-400'
-                        }`}>{l}</button>
-                    ))}
-                  </div>
-                </div>
-              )}
+          {/* Contextual selectors */}
+          {reportType==='milestone_status' && (
+            <div className="card p-5">
+              <h3 className="font-semibold text-slate-100 text-sm mb-3">Select Milestone</h3>
+              <div className="relative">
+                <select className="input text-sm appearance-none pr-7" value={milFilter} onChange={e=>setMilFilter(e.target.value)}>
+                  {MILESTONES.map(m=><option key={m.id} value={m.id}>{m.icon} {m.name}</option>)}
+                </select>
+                <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-400 pointer-events-none"/>
+              </div>
+            </div>
+          )}
+          {reportType==='groups' && (
+            <div className="card p-5">
+              <h3 className="font-semibold text-slate-100 text-sm mb-3">Select Milestone</h3>
+              <div className="relative">
+                <select className="input text-sm appearance-none pr-7" value={groupMil} onChange={e=>setGroupMil(e.target.value)}>
+                  {GROUP_MILESTONES.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+                <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-400 pointer-events-none"/>
+              </div>
+            </div>
+          )}
+          {(reportType==='individual'||reportType==='comm_student') && (
+            <div className="card p-5">
+              <h3 className="font-semibold text-slate-100 text-sm mb-3">Select Student</h3>
+              <div className="relative">
+                <select className="input text-sm appearance-none pr-7" value={selStudent} onChange={e=>setSelStudent(e.target.value)}>
+                  {filteredStudents.map(s=>(
+                    <option key={s.id} value={s.id}>{s.name} — {s.student_id||s.email}</option>
+                  ))}
+                </select>
+                <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-400 pointer-events-none"/>
+              </div>
             </div>
           )}
 
           {/* Export */}
-          <div className="card p-4">
-            <h2 className="font-display font-semibold text-slate-100 mb-3 text-sm">Export & Share</h2>
+          <div className="card p-5">
+            <h3 className="font-semibold text-slate-100 text-sm mb-3">Export</h3>
             <div className="space-y-2">
               {[
-                { fmt: 'excel', icon: FileSpreadsheet, label: 'Excel (.xlsx)', color: 'text-emerald-400' },
-                { fmt: 'csv',   icon: FileText,        label: 'CSV',           color: 'text-blue-400'   },
-                { fmt: 'pdf',   icon: FileText,        label: 'PDF',           color: 'text-red-400'    },
-                { fmt: 'print', icon: Printer,         label: 'Print',         color: 'text-slate-400'  },
-              ].map(({fmt, icon: Icon, label, color})=>(
+                { fmt:'excel', icon:FileSpreadsheet, label:'Excel (.xlsx)', color:'text-emerald-400' },
+                { fmt:'csv',   icon:FileText,        label:'CSV',           color:'text-blue-400'    },
+                { fmt:'pdf',   icon:FileText,        label:'PDF',           color:'text-red-400'     },
+                { fmt:'print', icon:Printer,         label:'Print',         color:'text-slate-400'   },
+              ].map(({fmt,icon:Icon,label,color})=>(
                 <button key={fmt} onClick={()=>exportAs(fmt)}
                   disabled={generating||!rows.length}
                   className="w-full btn-secondary justify-between disabled:opacity-40 text-xs py-2">
-                  <span className="flex items-center gap-2"><Icon size={13} className={color}/>{label}</span>
-                  {generating?<Loader2 size={11} className="animate-spin"/>:<Download size={11} className="text-navy-500"/>}
+                  <span className="flex items-center gap-2">
+                    <Icon size={13} className={color}/>{label}
+                  </span>
+                  {generating ? <Loader2 size={11} className="animate-spin"/> : <Download size={11} className="text-navy-500"/>}
                 </button>
               ))}
 
-              {/* Send by email */}
-              <button onClick={()=>setShowEmailSend(v=>!v)}
+              {/* Email */}
+              <button onClick={()=>setShowEmail(v=>!v)}
                 className="w-full btn-secondary justify-between text-xs py-2">
-                <span className="flex items-center gap-2"><Mail size={13} className="text-amber-400"/>Send by Email</span>
-                <ChevronDown size={11} className={`text-navy-500 transition-transform ${showEmailSend?'rotate-180':''}`}/>
+                <span className="flex items-center gap-2">
+                  <Mail size={13} className="text-amber-400"/>Send by Email
+                </span>
+                <ChevronDown size={11} className={`text-navy-500 transition-transform ${showEmail?'rotate-180':''}`}/>
               </button>
-              {showEmailSend && (
+              {showEmail && (
                 <div className="space-y-2 pt-1">
                   <input className="input text-xs py-2" type="email"
-                    placeholder="Enter recipient email…"
+                    placeholder="Recipient email address…"
                     value={emailTo} onChange={e=>setEmailTo(e.target.value)}/>
-                  <button onClick={sendByEmail} disabled={emailSending||!emailTo.trim()||!rows.length}
+                  <button onClick={sendReport}
+                    disabled={emailSending||!emailTo.trim()||!rows.length}
                     className="btn-primary w-full justify-center text-xs py-2 disabled:opacity-50">
                     {emailSending?<Loader2 size={12} className="animate-spin"/>:<Send size={12}/>}
                     {emailSending?'Sending…':'Send Report'}
                   </button>
                   {emailResult && (
-                    <p className={`text-xs px-2 py-1.5 rounded-lg ${emailResult.ok?'text-emerald-300 bg-emerald-900/20':'text-red-300 bg-red-900/20'}`}>
+                    <p className={`text-xs px-2 py-1.5 rounded-lg ${emailResult.ok?'text-emerald-300 bg-emerald-900/20 border border-emerald-700/40':'text-red-300 bg-red-900/20 border border-red-700/40'}`}>
                       {emailResult.msg}
                     </p>
                   )}
@@ -666,9 +709,10 @@ export default function Reports() {
               )}
             </div>
 
-            <div className="mt-3 pt-3 border-t border-navy-700/50 space-y-0.5">
-              <p className="text-xs text-navy-500">{rows.length} record{rows.length!==1?'s':''} · {headers.length} columns</p>
-              <p className="text-xs text-gold-400 font-medium">{SIGNATURE.name}</p>
+            {/* Records count + signature */}
+            <div className="mt-4 pt-3 border-t border-navy-700/50 space-y-1">
+              <p className="text-xs text-navy-500">{rows.length} record{rows.length!==1?'s':''}</p>
+              <p className="text-xs font-semibold text-gold-400">{SIGNATURE.name}</p>
               <p className="text-xs text-navy-400">{SIGNATURE.title}</p>
             </div>
           </div>
@@ -677,51 +721,55 @@ export default function Reports() {
 
         {/* ── Preview panel ── */}
         <div className="col-span-3 card p-6">
-          <div className="flex items-start justify-between mb-5">
+
+          {/* Preview header */}
+          <div className="flex items-start justify-between mb-1">
             <div>
-              <h2 className="font-display font-semibold text-slate-100">{getTitle()}</h2>
-              <p className="text-xs text-navy-400 mt-1">
-                {rows.length} records
-                {cohortFilter!=='all' && <span className="ml-2 text-gold-400/70">· {cohortFilter} Cohort</span>}
-              </p>
+              <h2 className="font-display font-semibold text-slate-100 text-lg">{getTitle()}</h2>
+              <p className="text-xs text-navy-400 mt-1">{getSubtitle()}</p>
             </div>
-            <span className="text-xs text-navy-500 bg-navy-800/60 px-2.5 py-1 rounded-lg shrink-0 ml-4">
-              Showing first 10 rows
+            <span className="text-xs text-navy-500 bg-navy-800/60 border border-navy-700/40 px-3 py-1 rounded-lg shrink-0 ml-4">
+              Preview — first 10 rows
             </span>
           </div>
 
+          <div className="h-px bg-navy-700/50 mb-5"/>
+
           {loading ? (
-            <div className="space-y-2">{[1,2,3,4].map(i=><div key={i} className="h-10 rounded-xl bg-navy-800/40 shimmer"/>)}</div>
+            <div className="space-y-2">
+              {[1,2,3,4,5].map(i=><div key={i} className="h-9 rounded-xl bg-navy-800/40 shimmer"/>)}
+            </div>
           ) : rows.length===0 ? (
-            <div className="text-center py-20 text-navy-500">
-              <FileText size={36} className="mx-auto mb-3 opacity-30"/>
-              <p className="text-sm font-medium">No data for this report</p>
-              <p className="text-xs mt-1 opacity-70">
-                {cohortFilter!=='all'
-                  ? `No data found for the ${cohortFilter} cohort.`
-                  : 'No data available yet.'}
-              </p>
+            <div className="text-center py-20">
+              <FileText size={36} className="mx-auto mb-3 text-navy-700"/>
+              <p className="text-sm font-medium text-navy-500">No data available for this report</p>
+              {cohortFilter!=='all' && (
+                <p className="text-xs text-navy-600 mt-1">No records found for the {cohortFilter} cohort</p>
+              )}
             </div>
           ) : (
             <>
               <div className="overflow-x-auto rounded-xl border border-navy-700/40">
-                <table className="w-full text-xs">
+                <table className="w-full">
                   <thead>
-                    <tr className="border-b border-navy-700/50 bg-navy-800/60">
+                    <tr className="bg-navy-800/80 border-b border-navy-700/50">
                       {headers.map(h=>(
-                        <th key={h} className="text-left px-3 py-3 text-navy-300 font-semibold whitespace-nowrap">{h}</th>
+                        <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-navy-200 uppercase tracking-wider whitespace-nowrap">
+                          {h}
+                        </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {rows.slice(0,10).map((row,i)=>(
-                      <tr key={i} className={`border-b border-navy-700/20 ${i%2===0?'':'bg-navy-800/10'} hover:bg-navy-700/20 transition-colors`}>
+                      <tr key={i} className={`border-b border-navy-700/20 transition-colors hover:bg-navy-700/20 ${i%2===0?'bg-transparent':'bg-navy-800/10'}`}>
                         {headers.map(h=>(
-                          <td key={h} className="px-3 py-2.5 text-slate-300 max-w-[200px]">
+                          <td key={h} className="px-4 py-2.5 text-xs text-slate-300 max-w-[180px]">
                             <span className="block truncate" title={row[h]==null?'':String(row[h])}>
-                              {row[h]==null||row[h]===''
+                              {!row[h] || row[h]===''
                                 ? <span className="text-navy-700">—</span>
-                                : String(row[h])}
+                                : String(row[h])
+                              }
                             </span>
                           </td>
                         ))}
@@ -733,20 +781,19 @@ export default function Reports() {
 
               {rows.length>10 && (
                 <p className="text-xs text-navy-500 text-center mt-3">
-                  Showing 10 of {rows.length} records — export to see all
+                  Showing 10 of {rows.length} records — export to view all
                 </p>
               )}
 
-              {/* Signature */}
-              <div className="mt-6 pt-4 border-t border-navy-700/50 flex items-end justify-between">
+              {/* Signature footer in preview */}
+              <div className="mt-8 pt-5 border-t border-navy-700/40 flex items-end justify-between">
                 <div>
-                  <div className="w-36 border-t border-navy-600/60 mb-2"/>
-                  <p className="text-sm font-semibold text-gold-400">{SIGNATURE.name}</p>
-                  <p className="text-xs text-navy-400">{SIGNATURE.title}</p>
+                  <div className="w-40 border-t-2 border-gold-500/60 mb-2"/>
+                  <p className="text-sm font-bold text-gold-400">{SIGNATURE.name}</p>
+                  <p className="text-xs text-navy-400 mt-0.5">{SIGNATURE.title}</p>
+                  <p className="text-xs text-navy-500">{INSTITUTION}</p>
                 </div>
-                <p className="text-xs text-navy-600">
-                  {new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}
-                </p>
+                <p className="text-xs text-navy-600 italic">{fmtDate(new Date())}</p>
               </div>
             </>
           )}
