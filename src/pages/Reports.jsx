@@ -71,15 +71,33 @@ const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB',{day:'numeric',m
 const fmtShort= d => d ? new Date(d).toLocaleDateString('en-GB') : ''
 const fmtTime = d => d ? new Date(d).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : ''
 
-function extractResponses(sm) {
-  if (!sm?.response_data) return {}
+// Expected columns per milestone — always shown even if empty
+const MILESTONE_COLUMNS = {
+  orcid:            ['orcid_id'],
+  irb_approval:     ['proposal_title', 'irb_number', 'approval_date'],
+  proposal_defense: ['committee_notes'],
+  progress_1:       ['submission_date', 'progress_summary'],
+  progress_2:       ['submission_date', 'progress_summary'],
+  defense_schedule: ['defense_date', 'defense_time'],
+  thesis_submission: ['final_title', 'submission_date', 'submission_notes'],
+}
+
+function extractResponses(sm, milestoneId) {
+  // Build base row with expected columns for this milestone (empty by default)
+  const expectedKeys = MILESTONE_COLUMNS[milestoneId] || []
+  const out = {}
+  for (const k of expectedKeys) out[fLabel(k)] = ''
+
+  if (!sm?.response_data) return out
+
   // Handle both parsed JSON object and raw JSON string
   let rd = sm.response_data
   if (typeof rd === 'string') {
-    try { rd = JSON.parse(rd) } catch { return {} }
+    try { rd = JSON.parse(rd) } catch { return out }
   }
-  if (!rd || typeof rd !== 'object') return {}
-  const out = {}
+  if (!rd || typeof rd !== 'object') return out
+
+  // Fill in actual values
   for (const [k, v] of Object.entries(rd)) {
     if (v !== null && v !== undefined && v !== '' && k !== 'group') {
       out[fLabel(k)] = String(v)
@@ -162,7 +180,7 @@ function buildMilestoneStatus(students, milestoneId, milestoneGroupsData) {
       row['Location']     = g.notes || ''
     }
     // Actual submitted response data
-    Object.assign(row, extractResponses(sm))
+    Object.assign(row, extractResponses(sm, milestoneId))
     return row
   })
 }
@@ -202,7 +220,7 @@ function buildIndividual(student) {
       'Group':          sm?.group_name ? `Group ${sm.group_name}` : '',
       'Completed Date': sm?.completed_at ? fmtDate(sm.completed_at) : '',
     }
-    Object.assign(row, extractResponses(sm))
+    Object.assign(row, extractResponses(sm, m.id))
     return row
   })
 }
