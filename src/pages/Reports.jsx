@@ -73,9 +73,17 @@ const fmtTime = d => d ? new Date(d).toLocaleTimeString('en-GB',{hour:'2-digit',
 
 function extractResponses(sm) {
   if (!sm?.response_data) return {}
+  // Handle both parsed JSON object and raw JSON string
+  let rd = sm.response_data
+  if (typeof rd === 'string') {
+    try { rd = JSON.parse(rd) } catch { return {} }
+  }
+  if (!rd || typeof rd !== 'object') return {}
   const out = {}
-  for (const [k,v] of Object.entries(sm.response_data)) {
-    if (v && k !== 'group') out[fLabel(k)] = String(v)
+  for (const [k, v] of Object.entries(rd)) {
+    if (v !== null && v !== undefined && v !== '' && k !== 'group') {
+      out[fLabel(k)] = String(v)
+    }
   }
   return out
 }
