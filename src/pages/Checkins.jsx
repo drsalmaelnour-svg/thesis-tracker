@@ -381,7 +381,6 @@ export default function Checkins() {
         </div>
       )}
 
-    </div>
       {selectedCheckin && (
         <CheckinDetailModal
           checkin={selectedCheckin}
@@ -389,5 +388,6 @@ export default function Checkins() {
           onClose={() => setSelectedCheckin(null)}
         />
       )}
+    </div>
   )
 }
