@@ -3,6 +3,7 @@ import {
   Send, Loader2, RefreshCw, AlertCircle, CheckCircle2,
   Clock, Users, ChevronDown, GraduationCap, ClipboardList, Filter
 } from 'lucide-react'
+import CheckinDetailModal from '../components/CheckinDetailModal'
 import {
   getStudentsWithProgress, getSupervisorCheckins,
   getStudentCheckins, getCheckinLink, getStudentCheckinLink
@@ -48,7 +49,9 @@ export default function Checkins() {
   const [sendingSuper, setSendingSuper]   = useState({})
   const [bulkSending, setBulkSending]     = useState(null) // 'students'|'supervisors'|null
   const [cohortFilter, setCohortFilter]   = useState('all')
-  const [activeTab, setActiveTab]         = useState('overview') // overview|students|supervisors
+  const [activeTab, setActiveTab]         = useState('overview')
+  const [selectedCheckin, setSelectedCheckin] = useState(null)
+  const [checkinType, setCheckinType]     = useState('student') // overview|students|supervisors
 
   async function load() {
     setLoading(true)
@@ -236,7 +239,9 @@ export default function Checkins() {
                 {stuCheckins.slice(0,8).map(c => {
                   const cfg = STUDENT_STATUS[c.overall_status]
                   return (
-                    <div key={c.id} className={`p-3 rounded-xl border ${cfg.color}`}>
+                    <div key={c.id}
+                      onClick={() => { setSelectedCheckin(c); setCheckinType('student') }}
+                      className={`p-3 rounded-xl border cursor-pointer hover:opacity-90 transition-opacity ${cfg.color}`}>
                       <div className="flex items-start justify-between gap-2 mb-1">
                         <div>
                           <p className="text-sm font-semibold">{c.students?.name}</p>
@@ -249,6 +254,7 @@ export default function Checkins() {
                       {c.challenges && <p className="text-xs opacity-70 mt-1 line-clamp-1">⚠ {c.challenges}</p>}
                       {c.support_needed && <p className="text-xs opacity-70 mt-0.5 line-clamp-1">→ {c.support_needed}</p>}
                       <p className="text-xs opacity-50 mt-1.5">{formatDistanceToNow(new Date(c.submitted_at), {addSuffix:true})}</p>
+                      <p className="text-xs opacity-40 mt-1">Click to read full response →</p>
                     </div>
                   )
                 })}
@@ -268,7 +274,9 @@ export default function Checkins() {
                 {supCheckins.slice(0,8).map(c => {
                   const cfg = SUPERVISOR_STATUS[c.engagement_status]
                   return (
-                    <div key={c.id} className={`p-3 rounded-xl border ${cfg.color}`}>
+                    <div key={c.id}
+                      onClick={() => { setSelectedCheckin(c); setCheckinType('supervisor') }}
+                      className={`p-3 rounded-xl border cursor-pointer hover:opacity-90 transition-opacity ${cfg.color}`}>
                       <div className="flex items-start justify-between gap-2 mb-1">
                         <div>
                           <p className="text-sm font-semibold">{c.students?.name}</p>
@@ -285,6 +293,7 @@ export default function Checkins() {
                       <p className="text-xs opacity-50 mt-1.5">
                         {c.supervisors?.name} · {formatDistanceToNow(new Date(c.submitted_at), {addSuffix:true})}
                       </p>
+                      <p className="text-xs opacity-40 mt-1">Click to read full response →</p>
                     </div>
                   )
                 })}
@@ -373,5 +382,12 @@ export default function Checkins() {
       )}
 
     </div>
+      {selectedCheckin && (
+        <CheckinDetailModal
+          checkin={selectedCheckin}
+          type={checkinType}
+          onClose={() => setSelectedCheckin(null)}
+        />
+      )}
   )
 }
