@@ -52,12 +52,17 @@ export default function CheckinDetailModal({ checkin, type, onClose }) {
   const [sending, setSending]         = useState(false)
   const [sent, setSent]               = useState(false)
 
-  const isStudent    = type === 'student'
-  const studentName  = isStudent ? checkin.students?.name : checkin.students?.name
-  const studentId    = isStudent ? checkin.students?.student_id : checkin.students?.student_id
-  const supervisorName = isStudent ? checkin.students?.supervisors?.name : checkin.supervisors?.name
-  const supervisorEmail = isStudent ? checkin.students?.supervisors?.email : checkin.supervisors?.email
-  const studentEmail = checkin.students?.email || checkin.student_email || ''
+  const isStudent       = type === 'student'
+  const studentName     = checkin.students?.name || ''
+  const studentId       = checkin.students?.student_id || ''
+  const studentEmail    = checkin.students?.email || ''
+  // Supervisor info — source differs by check-in type
+  const supervisorName  = isStudent
+    ? checkin.students?.supervisors?.name
+    : checkin.supervisors?.name
+  const supervisorEmail = isStudent
+    ? checkin.students?.supervisors?.email
+    : checkin.supervisors?.email
 
   const statusCfg = isStudent
     ? STUDENT_STATUS[checkin.overall_status]

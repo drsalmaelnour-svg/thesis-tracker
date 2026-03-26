@@ -178,7 +178,7 @@ export async function getSupervisorCheckins() {
     .select(`
       *,
       supervisors ( id, name, email ),
-      students ( id, name, student_id, program )
+      students ( id, name, email, student_id, program )
     `)
     .order('submitted_at', { ascending: false })
   if (error) throw error
@@ -198,7 +198,7 @@ export async function getCheckinLink(supervisorId, studentId) {
 export async function getStudentCheckins() {
   const { data, error } = await supabase
     .from('student_checkins')
-    .select(`*, students ( id, name, student_id, program, enrollment_year, supervisors(name) )`)
+    .select(`*, students ( id, name, email, student_id, program, enrollment_year, supervisors(id, name, email) )`)
     .order('submitted_at', { ascending: false })
   if (error) throw error
   return data || []
