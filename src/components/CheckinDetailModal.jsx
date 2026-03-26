@@ -67,15 +67,22 @@ export default function CheckinDetailModal({ checkin, type, onClose }) {
     setDraftTarget(target)
     setSent(false)
 
-    if (isStudent && target === 'supervisor') {
-      setDraftSubject(`Student Support — ${studentName} (${studentId})`)
-      setDraftBody(`Dear ${supervisorName || 'Supervisor'},\n\nI am writing regarding your student ${studentName} (${studentId}).\n\nDuring a recent check-in, it was noted that this student may benefit from additional support or guidance at this time.\n\nI would appreciate it if you could arrange a meeting with your student at your earliest convenience.\n\nPlease do not hesitate to contact me if you need any further information.\n\nBest regards,\n${checkin.coordinator_name || 'Dr. Salma Elnour'}\nThesis Coordinator`)
-    } else if (!isStudent && target === 'student') {
+    if (target === 'student' && isStudent) {
+      // Reply to student who submitted a check-in
+      setDraftSubject(`Re: Your Thesis Check-in — ${studentName}`)
+      setDraftBody(`Dear ${studentName},\n\nThank you for completing your thesis check-in and for sharing your progress with us.\n\nI have reviewed your response and I want to assure you that your concerns have been noted. Please know that you have our full support, and we are committed to helping you navigate any challenges you may be facing.\n\nI will follow up with you shortly regarding next steps. In the meantime, please do not hesitate to reach out to me directly if you need anything.\n\nBest regards,\nDr. Salma Elnour\nThesis Coordinator`)
+    } else if (target === 'student' && !isStudent) {
+      // Contact student based on supervisor check-in
       setDraftSubject(`Thesis Progress — ${studentName} (${studentId})`)
-      setDraftBody(`Dear ${studentName},\n\nI hope this message finds you well.\n\nI am writing to check in on your thesis progress and to remind you of the importance of maintaining regular communication with your supervisor.\n\nPlease do not hesitate to reach out if you require any support or guidance from the thesis coordination office.\n\nBest regards,\nDr. Salma Elnour\nThesis Coordinator`)
-    } else if (target === 'escalate') {
-      setDraftSubject(`Escalation — Student Concern: ${studentName} (${studentId})`)
-      setDraftBody(`Dear [Department Head],\n\nI am writing to bring to your attention a concern regarding the thesis progress of ${studentName} (${studentId}).\n\nThis matter requires your consideration and guidance.\n\nI am available to discuss this further at your convenience.\n\nBest regards,\nDr. Salma Elnour\nThesis Coordinator`)
+      setDraftBody(`Dear ${studentName},\n\nI hope this message finds you well.\n\nI am writing to check in on your thesis progress. As your thesis coordinator, I want to ensure you have the support you need to stay on track.\n\nPlease feel free to reach out to me directly if you have any questions, concerns, or require any assistance.\n\nBest regards,\nDr. Salma Elnour\nThesis Coordinator`)
+    } else if (target === 'supervisor') {
+      // Contact supervisor about student check-in
+      setDraftSubject(`Student Progress Update — ${studentName} (${studentId})`)
+      setDraftBody(`Dear ${supervisorName || 'Dr.'},\n\nI hope this message finds you well.\n\nI am writing regarding your student ${studentName} (${studentId}). As part of our thesis coordination process, I wanted to bring to your attention that this student may benefit from some additional guidance and support at this time.\n\nI would greatly appreciate it if you could arrange a meeting with your student at your earliest convenience to discuss their progress and provide any necessary guidance.\n\nPlease do not hesitate to contact me if you have any questions or concerns.\n\nBest regards,\nDr. Salma Elnour\nThesis Coordinator`)
+    } else if (target === 'supervisor_reply') {
+      // Reply to supervisor who submitted a check-in
+      setDraftSubject(`Re: Student Check-in — ${studentName} (${studentId})`)
+      setDraftBody(`Dear ${checkin.supervisors?.name || 'Dr.'},\n\nThank you for submitting your check-in report regarding ${studentName} (${studentId}).\n\nI have noted your feedback and will take the appropriate steps to follow up on the matters raised. Your engagement in the thesis coordination process is greatly appreciated and plays a vital role in supporting our students.\n\nI will keep you informed of any developments. Please do not hesitate to contact me if you have any further concerns.\n\nBest regards,\nDr. Salma Elnour\nThesis Coordinator`)
     }
 
     setShowDraft(true)
@@ -85,7 +92,7 @@ export default function CheckinDetailModal({ checkin, type, onClose }) {
     if (!draftSubject.trim() || !draftBody.trim()) return
     setSending(true)
     try {
-      if (isStudent && draftTarget === 'supervisor' && supervisorEmail) {
+      if ((draftTarget === 'supervisor') && supervisorEmail) {
         await sendSupervisorEmail({
           supervisor: { name: supervisorName, email: supervisorEmail },
           student:    checkin.students || { name: studentName, student_id: studentId, email: studentEmail },
@@ -93,8 +100,15 @@ export default function CheckinDetailModal({ checkin, type, onClose }) {
           subject:    draftSubject,
           message:    draftBody,
         })
+      } else if (draftTarget === 'supervisor_reply' && checkin.supervisors?.email) {
+        await sendSupervisorEmail({
+          supervisor: { name: checkin.supervisors.name, email: checkin.supervisors.email },
+          student:    checkin.students || { name: studentName, student_id: studentId, email: studentEmail },
+          milestoneId: null,
+          subject:    draftSubject,
+          message:    draftBody,
+        })
       } else {
-        // Send to student or escalate — use generic email
         await sendStudentEmail({
           student:    { name: studentName, email: studentEmail, token: '' },
           milestoneId: null,
@@ -213,21 +227,31 @@ export default function CheckinDetailModal({ checkin, type, onClose }) {
         {/* Action footer */}
         {!showDraft && (
           <div className="p-6 border-t border-navy-700/50 shrink-0">
-            <p className="text-xs text-navy-500 mb-3">Draft a confidential communication based on this check-in:</p>
+            <p className="text-xs text-navy-500 mb-3">Draft a confidential communication — always editable before sending:</p>
             <div className="flex flex-wrap gap-2">
-              {isStudent && supervisorEmail && (
-                <button onClick={()=>openDraft('supervisor')} className="btn-secondary text-xs">
-                  <Send size={13}/> Draft Email to Supervisor
-                </button>
+              {isStudent ? (
+                <>
+                  <button onClick={()=>openDraft('student')} className="btn-primary text-xs">
+                    <Send size={13}/> Reply to Student
+                  </button>
+                  {supervisorEmail && (
+                    <button onClick={()=>openDraft('supervisor')} className="btn-secondary text-xs">
+                      <Send size={13}/> Contact Supervisor
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <button onClick={()=>openDraft('supervisor_reply')} className="btn-primary text-xs">
+                    <Send size={13}/> Reply to Supervisor
+                  </button>
+                  {studentEmail && (
+                    <button onClick={()=>openDraft('student')} className="btn-secondary text-xs">
+                      <Send size={13}/> Contact Student
+                    </button>
+                  )}
+                </>
               )}
-              {!isStudent && studentEmail && (
-                <button onClick={()=>openDraft('student')} className="btn-secondary text-xs">
-                  <Send size={13}/> Draft Email to Student
-                </button>
-              )}
-              <button onClick={()=>openDraft('escalate')} className="btn-secondary text-xs text-amber-400 border-amber-700/40 hover:border-amber-600/60">
-                <Send size={13}/> Escalate to Department
-              </button>
               <button onClick={onClose} className="btn-ghost text-xs ml-auto">Close</button>
             </div>
           </div>
