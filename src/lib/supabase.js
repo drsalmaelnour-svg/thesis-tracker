@@ -454,3 +454,67 @@ export function getExaminerPortalLink(token) {
   const base = window.location.origin + window.location.pathname.split('#')[0].replace(/\/$/, '')
   return `${base}/#/examiner-portal?t=${token}`
 }
+
+// ── Assessment submission helpers ─────────────────────────────────────────────
+
+export async function getSubmissionByAssignment(assignmentId) {
+  const { data } = await supabase
+    .from('assessment_submissions')
+    .select('*')
+    .eq('assignment_id', assignmentId)
+    .single()
+  return data || null
+}
+
+export async function upsertSubmission(submission) {
+  const { data, error } = await supabase
+    .from('assessment_submissions')
+    .upsert(submission, { onConflict: 'assignment_id' })
+    .select().single()
+  if (error) throw error
+  return data
+}
+
+export async function lockSubmission(submissionId, lock = true) {
+  const { error } = await supabase
+    .from('assessment_submissions')
+    .update({
+      locked: lock,
+      locked_at: lock ? new Date().toISOString() : null,
+      locked_by: lock ? 'Dr. Salma Elnour' : null,
+    })
+    .eq('id', submissionId)
+  if (error) throw error
+}
+
+export async function getStudentAssessmentResults(studentId) {
+  const { data, error } = await supabase
+    .from('assessment_assignments')
+    .select(`
+      *,
+      students(id, name, student_id, program, enrollment_year, supervisors(id, name, email)),
+      external_examiners(id, name, email, designation, institution),
+      assessment_submissions(*)
+    `)
+    .eq('student_id', studentId)
+    .order('assessment_type')
+  if (error) throw error
+  return data || []
+}
+
+export async function getAllSubmissions(cohortStudentIds) {
+  const { data, error } = await supabase
+    .from('assessment_submissions')
+    .select(`
+      *,
+      assessment_assignments(
+        id, examiner_number, examiner_type, examiner_id, student_id,
+        external_examiners(name, email, designation),
+        students(id, name, student_id, enrollment_year, supervisors(id, name, email))
+      )
+    `)
+    .in('student_id', cohortStudentIds)
+    .order('submitted_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}

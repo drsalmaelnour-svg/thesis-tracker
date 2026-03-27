@@ -38,13 +38,14 @@ export default function ExaminerPortal() {
 
         // Find the paired assignment (before ↔ after) for same student + examiner number
         const pairedType = asgn.assessment_type === 'defense_before' ? 'defense_after' : 'defense_before'
-        const { data: paired } = await supabase
+        const { data: paired, error: pairedErr } = await supabase
           .from('assessment_assignments')
           .select('id, token, assessment_type')
           .eq('student_id', asgn.student_id)
           .eq('assessment_type', pairedType)
           .eq('examiner_number', asgn.examiner_number)
-          .single()
+          .maybeSingle()
+        if (pairedErr) console.warn('Paired assignment lookup:', pairedErr.message)
 
         // Check submission status for both
         const [sub1, sub2] = await Promise.all([

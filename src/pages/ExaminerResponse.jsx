@@ -165,6 +165,7 @@ export default function ExaminerResponse() {
   const [errorMsg,   setErrorMsg]   = useState('')
 
   // Form state
+  const [existingSubmission, setExistingSubmission] = useState(null)
   const [scores,      setScores]      = useState({})
   const [checks,      setChecks]      = useState({})
   const [checkNotes,  setCheckNotes]  = useState({})
@@ -185,13 +186,21 @@ export default function ExaminerResponse() {
           .single()
         if (error || !asgn) throw new Error('Invalid or expired evaluation link.')
 
-        // Check not already submitted
+        // Check for existing submission — load it for editing
         const { data: existing } = await supabase
           .from('assessment_submissions')
-          .select('id')
+          .select('*')
           .eq('assignment_id', asgn.id)
           .single()
-        if (existing) { setAssignment(asgn); setStudent(asgn.students); setStage('already_submitted'); return }
+        if (existing) {
+          // If locked — show read-only
+          if (existing.locked) {
+            setAssignment(asgn); setStudent(asgn.students)
+            setExistingSubmission(existing); setStage('locked'); return
+          }
+          // If not locked — load answers for editing
+          setExistingSubmission(existing)
+        }
 
         // Load examiner info
         let examinerData = null
@@ -214,6 +223,17 @@ export default function ExaminerResponse() {
         setStudent(asgn.students)
         setExaminer(examinerData)
         setGroup(grp)
+
+        // Pre-fill form if editing existing submission
+        if (existing) {
+          setScores(existing.scores || {})
+          setComments(existing.comments || '')
+          setRec(existing.recommendation || '')
+          if (existing.checklist?.checks) setChecks(existing.checklist.checks)
+          if (existing.checklist?.notes) setCheckNotes(existing.checklist.notes)
+          if (existing.submission_date) setProposedDate(existing.proposed_date || '')
+        }
+
         setStage('form')
       } catch(e) {
         setErrorMsg(e.message || 'Something went wrong.')
@@ -264,7 +284,8 @@ export default function ExaminerResponse() {
       const now = new Date()
       const submissionDate = now.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})
 
-      await supabase.from('assessment_submissions').insert({
+      await supabase.from('assessment_submissions').upsert({
+        ...(existingSubmission ? { id: existingSubmission.id } : {}),
         assignment_id:   assignment.id,
         student_id:      student.id,
         assessment_type: assignment.assessment_type,
@@ -278,7 +299,8 @@ export default function ExaminerResponse() {
         checklist:       isFormative ? { checks, notes: checkNotes } : null,
         submission_date: submissionDate,
         submitted_at:    now.toISOString(),
-      })
+        locked:          false,
+      }, { onConflict: 'assignment_id' })
 
       // Mark submitted
       await supabase.from('assessment_assignments')
@@ -299,8 +321,25 @@ export default function ExaminerResponse() {
   if (stage === 'error') return (
     <Shell><div className="text-center py-16 space-y-4"><XCircle size={48} className="text-red-400 mx-auto"/><h2 className="text-xl font-bold text-white">Something went wrong</h2><p className="text-slate-400 text-sm">{errorMsg}</p><p className="text-slate-600 text-xs">Please contact Dr. Salma Elnour directly.</p></div></Shell>
   )
-  if (stage === 'already_submitted') return (
-    <Shell><div className="text-center py-16 space-y-4"><CheckCircle2 size={48} className="text-emerald-400 mx-auto"/><h2 className="text-xl font-bold text-white">Already Submitted</h2><p className="text-slate-400 text-sm">You have already submitted your evaluation for {student?.name}.</p><p className="text-slate-600 text-xs">Thank you for completing your assessment.</p></div></Shell>
+  if (stage === 'locked') return (
+    <Shell>
+      <div className="text-center py-10 space-y-4">
+        <div style={{width:'56px',height:'56px',borderRadius:'50%',background:'#fef3c7',border:'2px solid #d97706',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto'}}>
+          <svg width="24" height="24" fill="none" viewBox="0 0 24 24"><path d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5zm0 2a3 3 0 0 1 3 3v3H9V6a3 3 0 0 1 3-3zm0 9a2 2 0 1 1 0 4 2 2 0 0 1 0-4z" fill="#d97706"/></svg>
+        </div>
+        <h2 style={{fontSize:'20px',fontWeight:700,color:'#1e293b'}}>Evaluation Locked</h2>
+        <p style={{fontSize:'14px',color:'#64748b'}}>Your evaluation for <strong style={{color:'#1e293b'}}>{student?.name}</strong> has been locked by the thesis coordinator.</p>
+        {existingSubmission && (
+          <div style={{background:'#f8fafc',border:'1px solid #e2e8f0',borderRadius:'12px',padding:'16px',textAlign:'left',maxWidth:'320px',margin:'0 auto'}}>
+            <p style={{fontSize:'11px',color:'#94a3b8',marginBottom:'4px'}}>Your submitted score</p>
+            <p style={{fontSize:'22px',fontWeight:700,color:'#1e3a5f'}}>{existingSubmission.total_score} / {existingSubmission.max_score}</p>
+            <p style={{fontSize:'14px',color:'#d4a843',fontWeight:600}}>{existingSubmission.percentage}%</p>
+            <p style={{fontSize:'11px',color:'#94a3b8',marginTop:'8px'}}>Recommendation: {existingSubmission.recommendation}</p>
+          </div>
+        )}
+        <p style={{fontSize:'11px',color:'#94a3b8'}}>If you need to make changes, please contact Dr. Salma Elnour directly.</p>
+      </div>
+    </Shell>
   )
   if (stage === 'success') return (
     <Shell>

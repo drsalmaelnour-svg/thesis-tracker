@@ -3,14 +3,17 @@ import {
   UserCheck, Users, ChevronDown, Loader2, CheckCircle2,
   AlertCircle, RefreshCw, Send, X, UserPlus, Upload,
   Building2, Mail, BookOpen, Edit2, Save, Trash2,
-  Search, Filter, ClipboardList, TrendingUp, Info
+  Search, Filter, ClipboardList, TrendingUp, Info,
+  Lock, Unlock, Download, FileText, Eye
 } from 'lucide-react'
 import {
   getStudentsWithProgress, getExternalExaminers,
   upsertExternalExaminer, deleteExternalExaminer,
   getAssessmentAssignments, upsertAssessmentAssignment,
-  getExaminerResponseLink, getExaminerPortalLink, logActivity
+  getExaminerResponseLink, getExaminerPortalLink, logActivity,
+  lockSubmission, getAllSubmissions
 } from '../lib/supabase'
+import { sendStudentEmail, sendSupervisorEmail } from '../lib/emailService'
 import { sendStudentEmail } from '../lib/emailService'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -856,14 +859,370 @@ Gulf Medical University`)
 }
 
 // ══════════════════════════════════════════════════════════════
-// RESULTS TAB (placeholder — Phase 3)
+// RESULTS TAB
 // ══════════════════════════════════════════════════════════════
+const ASSESSMENT_LABELS = {
+  proposal_defense: 'Proposal Defense',
+  progress_1:       'First Progress Report',
+  progress_2:       'Second Progress Report',
+  defense_before:   'Defense Before',
+  defense_after:    'Defense After',
+}
+
 function ResultsTab({ students, assignments, supervisors, externals, getExaminerName }) {
+  const [submissions,   setSubmissions]   = useState([])
+  const [loading,       setLoading]       = useState(true)
+  const [selStudent,    setSelStudent]     = useState(students[0]?.id || '')
+  const [selType,       setSelType]       = useState('proposal_defense')
+  const [locking,       setLocking]       = useState(null)
+  const [emailSending,  setEmailSending]  = useState(null)
+  const [emailResult,   setEmailResult]   = useState(null)
+
+  useEffect(() => {
+    if (!students.length) return
+    const ids = students.map(s => s.id)
+    getAllSubmissions(ids).then(subs => {
+      setSubmissions(subs); setLoading(false)
+    }).catch(e => { console.error(e); setLoading(false) })
+  }, [students])
+
+  function getExaminerForAssignment(asgn) {
+    if (!asgn) return { name: '—', email: '' }
+    if (asgn.examiner_type === 'external') {
+      return { name: asgn.external_examiners?.name || '—', email: asgn.external_examiners?.email || '' }
+    }
+    const sup = supervisors.find(s => s.id === asgn.examiner_id)
+    return { name: sup?.name || '—', email: sup?.email || '' }
+  }
+
+  // Get submissions for selected student + type
+  function getStudentSubs(studentId, assessmentType) {
+    return submissions.filter(s =>
+      s.student_id === studentId && s.assessment_type === assessmentType
+    ).sort((a,b) => (a.assessment_assignments?.examiner_number||0) - (b.assessment_assignments?.examiner_number||0))
+  }
+
+  // Calculate averages
+  function calcAverage(subs) {
+    const scored = subs.filter(s => s.total_score !== null && s.max_score)
+    if (!scored.length) return null
+    const avgScore = scored.reduce((a,s) => a + s.total_score, 0) / scored.length
+    const avgPct   = scored.reduce((a,s) => a + (s.percentage||0), 0) / scored.length
+    return { avgScore: Math.round(avgScore * 10) / 10, avgPct: Math.round(avgPct * 10) / 10, max: scored[0].max_score }
+  }
+
+  async function handleLock(subId, lock) {
+    setLocking(subId)
+    try {
+      await lockSubmission(subId, lock)
+      // Notify examiner if locking
+      if (lock) {
+        const sub  = submissions.find(s => s.id === subId)
+        const asgn = sub?.assessment_assignments
+        if (asgn) {
+          const { name, email } = getExaminerForAssignment(asgn)
+          const student = students.find(s => s.id === sub.student_id)
+          if (email) {
+            await sendStudentEmail({
+              student: { name, email, token: '' },
+              milestoneId: null,
+              subject: `Evaluation Locked — ${student?.name || ''} — ${ASSESSMENT_LABELS[sub.assessment_type] || sub.assessment_type}`,
+              message: `Dear ${name},
+
+This is to inform you that your evaluation for the following student has been reviewed and locked by the thesis coordinator:
+
+Student: ${student?.name || ''}
+Registration No.: ${student?.student_id || ''}
+Assessment: ${ASSESSMENT_LABELS[sub.assessment_type] || sub.assessment_type}
+Your Score: ${sub.total_score} / ${sub.max_score} (${sub.percentage}%)
+
+If you believe a correction is necessary, please contact Dr. Salma Elnour directly.
+
+Thank you for your contribution to the thesis assessment process.
+
+Best regards,
+Dr. Salma Elnour
+Thesis Coordinator
+Gulf Medical University`,
+            })
+          }
+        }
+      }
+      // Refresh
+      const ids = students.map(s => s.id)
+      const subs = await getAllSubmissions(ids)
+      setSubmissions(subs)
+    } catch(e) { console.error(e) }
+    setLocking(null)
+  }
+
+  async function handleLockAll(studentId, assessmentType, lock) {
+    const subs = getStudentSubs(studentId, assessmentType)
+    for (const sub of subs) await handleLock(sub.id, lock)
+  }
+
+  async function sendReport(type) {
+    // type: 'student' | 'supervisor' | 'download'
+    const student = students.find(s => s.id === selStudent)
+    if (!student) return
+    const subs    = getStudentSubs(selStudent, selType)
+    if (!subs.length) { setEmailResult({ ok: false, msg: 'No submissions found.' }); return }
+    const avg     = calcAverage(subs)
+    const typeName= ASSESSMENT_LABELS[selType] || selType
+
+    // Build report text
+    let report = `THESIS ASSESSMENT REPORT\n`
+    report += `Gulf Medical University — MSc Medical Laboratory Sciences\n`
+    report += `${'─'.repeat(50)}\n\n`
+    report += `Student:     ${student.name}\n`
+    report += `Reg No.:     ${student.student_id}\n`
+    report += `Assessment:  ${typeName}\n`
+    report += `Date:        ${new Date().toLocaleDateString('en-GB', {day:'numeric',month:'long',year:'numeric'})}\n\n`
+
+    if (avg) {
+      report += `FINAL RESULT\n${'─'.repeat(30)}\n`
+      report += `Examiner 1 Score: ${subs[0]?.total_score || '—'} / ${subs[0]?.max_score || '—'} (${subs[0]?.percentage || '—'}%)\n`
+      if (subs[1]) report += `Examiner 2 Score: ${subs[1]?.total_score || '—'} / ${subs[1]?.max_score || '—'} (${subs[1]?.percentage || '—'}%)\n`
+      report += `Average Score:    ${avg.avgScore} / ${avg.max} (${avg.avgPct}%)\n\n`
+    }
+
+    subs.forEach((sub, i) => {
+      const examLabel = type === 'student' ? `Examiner ${i+1}` : getExaminerForAssignment(sub.assessment_assignments).name
+      report += `${examLabel}\n${'─'.repeat(30)}\n`
+      report += `Recommendation: ${sub.recommendation || '—'}\n`
+      if (sub.comments) report += `Comments: ${sub.comments}\n`
+      report += `\n`
+    })
+
+    if (type === 'student') {
+      setEmailSending('student')
+      try {
+        await sendStudentEmail({
+          student,
+          milestoneId: null,
+          subject: `Thesis Assessment Result — ${typeName}`,
+          message: `Dear ${student.name},\n\nPlease find below your thesis assessment result for ${typeName}.\n\n${report}\n\nIf you have any questions, please do not hesitate to contact the thesis coordination office.\n\nBest regards,\nDr. Salma Elnour\nThesis Coordinator`,
+        })
+        setEmailResult({ ok: true, msg: `Report sent to ${student.email}` })
+      } catch(e) { setEmailResult({ ok: false, msg: e.message }) }
+      setEmailSending(null)
+    } else if (type === 'supervisor') {
+      const sup = student.supervisors
+      if (!sup?.email) { setEmailResult({ ok: false, msg: 'No supervisor email found.' }); return }
+      setEmailSending('supervisor')
+      try {
+        await sendSupervisorEmail({
+          supervisor: sup,
+          student,
+          milestoneId: null,
+          subject: `Student Assessment Result — ${student.name} — ${typeName}`,
+          message: `Dear ${sup.name},\n\nPlease find below the assessment result for your student ${student.name} (${student.student_id}) for ${typeName}.\n\n${report}\n\nBest regards,\nDr. Salma Elnour\nThesis Coordinator`,
+        })
+        setEmailResult({ ok: true, msg: `Report sent to ${sup.email}` })
+      } catch(e) { setEmailResult({ ok: false, msg: e.message }) }
+      setEmailSending(null)
+    } else {
+      // Download as text
+      const blob = new Blob([report], { type: 'text/plain' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `assessment-${student.student_id}-${selType}-${new Date().toISOString().slice(0,10)}.txt`
+      a.click()
+    }
+  }
+
+  const student = students.find(s => s.id === selStudent)
+  const curSubs = getStudentSubs(selStudent, selType)
+  const avg     = calcAverage(curSubs)
+  const allTypes= ['proposal_defense','progress_1','progress_2','defense_before','defense_after']
+
   return (
-    <div className="card p-12 text-center text-navy-500">
-      <TrendingUp size={32} className="mx-auto mb-3 opacity-30"/>
-      <p className="text-sm font-medium">Results & Final Marks</p>
-      <p className="text-xs mt-1 opacity-70">Coming in Phase 3 — examiner response forms and score aggregation</p>
+    <div className="space-y-5">
+
+      {/* Student + assessment selector */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="card p-4">
+          <label className="block text-xs text-navy-400 mb-2 uppercase tracking-wider">Student</label>
+          <div className="relative">
+            <select className="input text-sm appearance-none pr-7" value={selStudent} onChange={e=>{setSelStudent(e.target.value);setEmailResult(null)}}>
+              {students.map(s=><option key={s.id} value={s.id}>{s.name} — {s.student_id}</option>)}
+            </select>
+            <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-400 pointer-events-none"/>
+          </div>
+        </div>
+        <div className="card p-4">
+          <label className="block text-xs text-navy-400 mb-2 uppercase tracking-wider">Assessment Type</label>
+          <div className="relative">
+            <select className="input text-sm appearance-none pr-7" value={selType} onChange={e=>{setSelType(e.target.value);setEmailResult(null)}}>
+              {allTypes.map(t=><option key={t} value={t}>{ASSESSMENT_LABELS[t]}</option>)}
+            </select>
+            <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-400 pointer-events-none"/>
+          </div>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="card p-12 text-center"><Loader2 size={24} className="animate-spin text-gold-400 mx-auto"/></div>
+      ) : curSubs.length === 0 ? (
+        <div className="card p-12 text-center text-navy-500">
+          <ClipboardList size={28} className="mx-auto mb-2 opacity-30"/>
+          <p className="text-sm font-medium">No submissions yet</p>
+          <p className="text-xs mt-1 opacity-70">Examiners have not submitted their evaluation for this assessment.</p>
+        </div>
+      ) : (
+        <>
+          {/* Average mark banner */}
+          {avg && (
+            <div className="card p-5 border-gold-500/30" style={{background:'linear-gradient(135deg,#1e3a5f,#254474)'}}>
+              <p className="text-xs text-gold-400/70 uppercase tracking-wider mb-1">Final Average Mark</p>
+              <div className="flex items-end gap-4">
+                <p className="text-4xl font-display font-bold text-white">{avg.avgPct}%</p>
+                <p className="text-lg text-gold-400 font-semibold mb-1">{avg.avgScore} / {avg.max}</p>
+              </div>
+              <div className="flex gap-4 mt-2">
+                {curSubs.map((sub,i) => (
+                  <p key={i} className="text-xs text-slate-300">
+                    Examiner {i+1}: {sub.total_score}/{sub.max_score} ({sub.percentage}%)
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Submissions */}
+          {curSubs.map((sub, i) => {
+            const examInfo = getExaminerForAssignment(sub.assessment_assignments)
+            return (
+              <div key={sub.id} className="card p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-display font-semibold text-slate-100 text-sm">Examiner {i+1}</h3>
+                      <span className="text-xs px-2 py-0.5 rounded-lg border border-navy-600/50 text-navy-400">
+                        {sub.assessment_assignments?.examiner_type === 'external' ? 'External' : 'Internal'}
+                      </span>
+                      {sub.locked && (
+                        <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-lg border border-amber-700/40 bg-amber-900/20 text-amber-300">
+                          <Lock size={10}/> Locked
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-navy-400 mt-0.5">{examInfo.name}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {sub.total_score !== null && (
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-gold-400">{sub.total_score}/{sub.max_score}</p>
+                        <p className="text-xs text-navy-400">{sub.percentage}%</p>
+                      </div>
+                    )}
+                    <button onClick={() => handleLock(sub.id, !sub.locked)} disabled={locking===sub.id}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
+                        sub.locked
+                          ? 'border-amber-700/40 bg-amber-900/10 text-amber-300 hover:bg-amber-900/20'
+                          : 'btn-secondary'
+                      }`}>
+                      {locking===sub.id ? <Loader2 size={12} className="animate-spin"/> :
+                       sub.locked ? <><Unlock size={12}/> Unlock</> : <><Lock size={12}/> Lock</>}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Scores table */}
+                {sub.scores && Object.keys(sub.scores).length > 0 && (
+                  <div className="overflow-x-auto rounded-xl border border-navy-700/40">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-navy-800/60 border-b border-navy-700/50">
+                          <th className="text-left px-3 py-2 text-navy-300 font-semibold">Criterion</th>
+                          <th className="text-center px-3 py-2 text-navy-300 font-semibold w-16">Score</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(sub.scores).map(([criterion, score], ci) => (
+                          <tr key={ci} className={`border-b border-navy-700/20 ${ci%2===0?'':'bg-navy-800/10'}`}>
+                            <td className="px-3 py-2 text-slate-300">{criterion}</td>
+                            <td className="px-3 py-2 text-center">
+                              <span className={`font-bold ${
+                                score===4?'text-emerald-400':score===3?'text-blue-400':score===2?'text-amber-400':'text-red-400'
+                              }`}>{score} / 4</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Checklist (formative) */}
+                {sub.checklist?.checks && (
+                  <div className="space-y-1.5">
+                    {Object.entries(sub.checklist.checks).map(([item, val]) => (
+                      <div key={item} className="flex items-start gap-2 text-xs">
+                        <span className={`shrink-0 mt-0.5 px-1.5 py-0.5 rounded font-bold ${
+                          val==='ok'?'bg-emerald-900/20 text-emerald-400':'bg-red-900/20 text-red-400'
+                        }`}>{val==='ok'?'✓':'✗'}</span>
+                        <span className="text-slate-300">{item}</span>
+                        {sub.checklist.notes?.[item] && (
+                          <span className="text-red-300/70 ml-1">— {sub.checklist.notes[item]}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {sub.comments && (
+                  <div className="bg-navy-800/20 rounded-xl p-3 border border-navy-700/30">
+                    <p className="text-xs text-navy-400 font-medium mb-1 uppercase tracking-wider">Comments</p>
+                    <p className="text-sm text-slate-300 leading-relaxed">{sub.comments}</p>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between text-xs text-navy-500">
+                  <span>Recommendation: <span className="text-slate-300 font-medium">{sub.recommendation || '—'}</span></span>
+                  <span>Submitted: {sub.submission_date || new Date(sub.submitted_at).toLocaleDateString('en-GB')}</span>
+                </div>
+              </div>
+            )
+          })}
+
+          {/* Lock all + Send reports */}
+          <div className="card p-5">
+            <h3 className="font-display font-semibold text-slate-100 mb-4 text-sm">Actions</h3>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={()=>handleLockAll(selStudent,selType,true)}
+                disabled={curSubs.every(s=>s.locked)||!!locking}
+                className="btn-secondary text-xs disabled:opacity-40">
+                <Lock size={13}/> Lock All Examiners
+              </button>
+              <button onClick={()=>handleLockAll(selStudent,selType,false)}
+                disabled={curSubs.every(s=>!s.locked)||!!locking}
+                className="btn-secondary text-xs disabled:opacity-40">
+                <Unlock size={13}/> Unlock All
+              </button>
+              <div className="w-px h-6 bg-navy-700/50 self-center mx-1"/>
+              <button onClick={()=>sendReport('download')} className="btn-secondary text-xs">
+                <Download size={13}/> Download Report
+              </button>
+              <button onClick={()=>sendReport('student')} disabled={emailSending==='student'} className="btn-secondary text-xs disabled:opacity-50">
+                {emailSending==='student'?<Loader2 size={13} className="animate-spin"/>:<Send size={13}/>}
+                Send to Student
+              </button>
+              <button onClick={()=>sendReport('supervisor')} disabled={emailSending==='supervisor'} className="btn-secondary text-xs disabled:opacity-50">
+                {emailSending==='supervisor'?<Loader2 size={13} className="animate-spin"/>:<Send size={13}/>}
+                Send to Supervisor
+              </button>
+            </div>
+            {emailResult && (
+              <div className={`mt-3 flex items-center gap-2 text-xs px-3 py-2 rounded-lg ${
+                emailResult.ok?'bg-emerald-900/20 text-emerald-300 border border-emerald-700/40':'bg-red-900/20 text-red-300 border border-red-700/40'
+              }`}>
+                {emailResult.ok?<CheckCircle2 size={12}/>:<AlertCircle size={12}/>} {emailResult.msg}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }
