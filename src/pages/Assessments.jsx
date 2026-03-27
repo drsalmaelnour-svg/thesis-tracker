@@ -4,7 +4,7 @@ import {
   AlertCircle, RefreshCw, Send, X, UserPlus, Upload,
   Building2, Mail, BookOpen, Edit2, Save, Trash2,
   Search, Filter, ClipboardList, TrendingUp, Info,
-  Lock, Unlock, Download, FileText, Eye
+  Lock, Unlock, Download, FileText, Eye, FileSpreadsheet
 } from 'lucide-react'
 import {
   getStudentsWithProgress, getExternalExaminers,
@@ -14,6 +14,321 @@ import {
   lockSubmission, getAllSubmissions
 } from '../lib/supabase'
 import { sendStudentEmail, sendSupervisorEmail } from '../lib/emailService'
+
+// ── PDF / CSV helpers ────────────────────────────────────────────────────────────
+
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    if (document.querySelector(`script[src="${src}"]`)) { res(); return }
+    const s = document.createElement('script')
+    s.src = src; s.onload = res; s.onerror = rej
+    document.head.appendChild(s)
+  })
+}
+
+const GMU_NAVY = [30, 58, 95]
+const GMU_GOLD = [212, 168, 67]
+const SCORE_LABELS_MAP = { 4:'Exceptional', 3:'Meets Expectations', 2:'Needs Revision', 1:'Inadequate' }
+
+async function generateIndividualPDF(student, assessmentType, subs, avg, getExaminerName, supervisors) {
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js')
+  const jsPDF = window.jspdf?.jsPDF || window.jsPDF
+  const doc   = new jsPDF({ orientation: 'portrait', unit: 'mm' })
+  const pageW = doc.internal.pageSize.getWidth()
+  const pageH = doc.internal.pageSize.getHeight()
+  const typeName = ASSESSMENT_LABELS[assessmentType] || assessmentType
+
+  // ── Header ──────────────────────────────────────────────────────────────────
+  doc.setFillColor(...GMU_NAVY); doc.rect(0, 0, pageW, 42, 'F')
+  doc.setFillColor(...GMU_GOLD); doc.rect(0, 42, pageW, 1.5, 'F')
+
+  // Institution
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...GMU_GOLD)
+  doc.text('GULF MEDICAL UNIVERSITY', 14, 11)
+  doc.setTextColor(180,210,240); doc.setFontSize(7.5); doc.setFont('helvetica','normal')
+  doc.text('MSc Medical Laboratory Sciences — Thesis Assessment Report', 14, 16)
+
+  // Title
+  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(255,255,255)
+  doc.text(typeName, 14, 28)
+
+  // Date + confidential
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(180,210,240)
+  doc.text(`Generated: ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}`, pageW-14, 11, {align:'right'})
+  doc.setTextColor(...GMU_GOLD); doc.setFontSize(7.5); doc.setFont('helvetica','bold')
+  doc.text('CONFIDENTIAL', pageW-14, 17, {align:'right'})
+
+  // ── Student info ─────────────────────────────────────────────────────────────
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(40,40,40)
+  const infoY = 50
+  const fields = [
+    ['Student Name', student.name],
+    ['Registration No.', student.student_id || '—'],
+    ['Supervisor', student.supervisors?.name || '—'],
+    ['Program', student.program || 'MSc Medical Laboratory Sciences'],
+    ['Assessment', typeName],
+    ['Report Date', new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})],
+  ]
+  fields.forEach(([label, val], i) => {
+    const x = i < 3 ? 14 : pageW/2 + 5
+    const y = infoY + (i%3) * 7
+    doc.setFont('helvetica','bold'); doc.setTextColor(...GMU_NAVY)
+    doc.text(label + ':', x, y)
+    doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40)
+    doc.text(val, x + 32, y)
+  })
+
+  // ── Final mark banner ────────────────────────────────────────────────────────
+  let curY = infoY + 24
+  if (avg) {
+    doc.setFillColor(...GMU_NAVY); doc.roundedRect(14, curY, pageW-28, 18, 2, 2, 'F')
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(255,255,255)
+    doc.text('FINAL AVERAGE MARK', 20, curY+7)
+    doc.setFontSize(14); doc.setTextColor(...GMU_GOLD)
+    doc.text(`${avg.avgPct}%`, pageW-20, curY+7, {align:'right'})
+    doc.setFontSize(8); doc.setTextColor(180,210,240); doc.setFont('helvetica','normal')
+    subs.forEach((sub,i) => {
+      doc.text(`Examiner ${i+1}: ${sub.total_score}/${sub.max_score} (${sub.percentage}%)`, 20 + i*60, curY+13)
+    })
+    curY += 24
+  }
+
+  // ── Per-examiner tables ───────────────────────────────────────────────────────
+  subs.forEach((sub, si) => {
+    const asgn     = sub.assessment_assignments
+    const examName = asgn?.examiner_type==='external'
+      ? asgn.external_examiners?.name
+      : supervisors.find(s=>s.id===asgn?.examiner_id)?.name || '—'
+
+    // Section label
+    doc.setFillColor(...GMU_GOLD); doc.setDrawColor(...GMU_GOLD)
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...GMU_NAVY)
+    doc.text(`Examiner ${si+1}${sub.locked?' (Locked)':''}`, 14, curY+5)
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(100,100,100)
+    doc.text(examName, 14, curY+10)
+    if (sub.total_score!==null) {
+      doc.setFont('helvetica','bold'); doc.setTextColor(...GMU_NAVY)
+      doc.text(`Score: ${sub.total_score}/${sub.max_score} (${sub.percentage}%)`, pageW-14, curY+7, {align:'right'})
+    }
+    curY += 14
+
+    // Scores table
+    if (sub.scores && Object.keys(sub.scores).length) {
+      doc.autoTable({
+        head: [['Criterion','Score','Level']],
+        body: Object.entries(sub.scores).map(([crit,score])=>[
+          crit, `${score} / 4`, SCORE_LABELS_MAP[score]||''
+        ]),
+        startY: curY,
+        styles: { fontSize: 8, cellPadding: 2.5 },
+        headStyles: { fillColor: GMU_NAVY, textColor: 255, fontStyle:'bold', fontSize:8 },
+        columnStyles: { 1:{ halign:'center', cellWidth:18 }, 2:{ cellWidth:34 } },
+        alternateRowStyles: { fillColor: [245,248,252] },
+        margin: { left:14, right:14 },
+        didParseCell: (data) => {
+          if (data.column.index===1 && data.section==='body') {
+            const score = parseInt(data.cell.raw)
+            if (score===4) data.cell.styles.textColor=[22,101,52]
+            else if (score===3) data.cell.styles.textColor=[30,64,175]
+            else if (score===2) data.cell.styles.textColor=[146,64,14]
+            else data.cell.styles.textColor=[153,27,27]
+          }
+        }
+      })
+      curY = doc.lastAutoTable.finalY + 5
+    }
+
+    // Checklist
+    if (sub.checklist?.checks) {
+      doc.autoTable({
+        head: [['Thesis Section','Status','Notes']],
+        body: Object.entries(sub.checklist.checks).map(([item,val])=>[
+          item,
+          val==='ok'?'Satisfactory':'Needs Improvement',
+          sub.checklist.notes?.[item]||''
+        ]),
+        startY: curY,
+        styles: { fontSize: 8, cellPadding: 2.5 },
+        headStyles: { fillColor: GMU_NAVY, textColor: 255, fontStyle:'bold', fontSize:8 },
+        columnStyles: { 1:{ cellWidth:30 }, 2:{ cellWidth:55 } },
+        alternateRowStyles: { fillColor: [245,248,252] },
+        margin: { left:14, right:14 },
+      })
+      curY = doc.lastAutoTable.finalY + 5
+    }
+
+    // Comments
+    if (sub.comments) {
+      doc.setFillColor(248,250,252); doc.setDrawColor(226,232,240)
+      doc.roundedRect(14, curY, pageW-28, 14, 1, 1, 'FD')
+      doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...GMU_NAVY)
+      doc.text('COMMENTS', 18, curY+5)
+      doc.setFont('helvetica','normal'); doc.setTextColor(60,60,60)
+      const lines = doc.splitTextToSize(sub.comments, pageW-36)
+      doc.text(lines.slice(0,2), 18, curY+10)
+      curY += 18
+    }
+
+    // Recommendation
+    if (sub.recommendation) {
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...GMU_NAVY)
+      doc.text('Recommendation: ', 14, curY+5)
+      doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40)
+      doc.text(sub.recommendation, 48, curY+5)
+      curY += 10
+    }
+
+    curY += 4
+  })
+
+  // ── Signature ────────────────────────────────────────────────────────────────
+  const sigY = Math.min(curY + 10, pageH - 30)
+  doc.setDrawColor(...GMU_GOLD); doc.setLineWidth(0.8)
+  doc.line(14, sigY, 75, sigY)
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...GMU_NAVY)
+  doc.text('Dr. Salma Elnour', 14, sigY+6)
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(100,100,100)
+  doc.text('Thesis Coordinator', 14, sigY+11)
+  doc.text('Gulf Medical University', 14, sigY+16)
+
+  // Page numbers
+  const pageCount = doc.internal.getNumberOfPages()
+  for (let i=1; i<=pageCount; i++) {
+    doc.setPage(i)
+    doc.setFontSize(7); doc.setTextColor(150,150,150); doc.setFont('helvetica','normal')
+    doc.text(`Page ${i} of ${pageCount}`, pageW/2, pageH-6, {align:'center'})
+  }
+
+  doc.save(`assessment-${student.student_id}-${assessmentType}-${new Date().toISOString().slice(0,10)}.pdf`)
+}
+
+async function generateCohortPDF(cohortYear, students, allSubs, supervisors) {
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js')
+  const jsPDF = window.jspdf?.jsPDF || window.jsPDF
+  const doc   = new jsPDF({ orientation: 'landscape', unit: 'mm' })
+  const pageW = doc.internal.pageSize.getWidth()
+  const pageH = doc.internal.pageSize.getHeight()
+
+  // Header
+  doc.setFillColor(...GMU_NAVY); doc.rect(0, 0, pageW, 38, 'F')
+  doc.setFillColor(...GMU_GOLD); doc.rect(0, 38, pageW, 1.5, 'F')
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...GMU_GOLD)
+  doc.text('GULF MEDICAL UNIVERSITY — MSc MEDICAL LABORATORY SCIENCES', 14, 10)
+  doc.setFontSize(16); doc.setTextColor(255,255,255)
+  doc.text(`${cohortYear} Cohort — Assessment Results Summary`, 14, 23)
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(180,210,240)
+  doc.text(`Generated: ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}  |  ${students.length} Students`, 14, 32)
+  doc.setTextColor(...GMU_GOLD); doc.setFont('helvetica','bold'); doc.setFontSize(7.5)
+  doc.text('CONFIDENTIAL', pageW-14, 32, {align:'right'})
+
+  // Build table
+  const assessTypes = ['proposal_defense','progress_1','progress_2','defense_before','defense_after']
+  const shortLabels = ['Proposal','Progress 1','Progress 2','Def. Before','Def. After']
+
+  const head = [['Reg No.','Student Name','Supervisor',...shortLabels,'Overall Avg']]
+  const body = students.map(student => {
+    const row = [
+      student.student_id || '',
+      student.name,
+      student.supervisors?.name || '—',
+    ]
+    let totalPct = 0, countPct = 0
+    assessTypes.forEach(aType => {
+      const subs = allSubs.filter(s =>
+        s.student_id===student.id && s.assessment_type===aType && s.total_score!==null
+      )
+      if (subs.length >= 1) {
+        const avg = subs.reduce((a,s)=>a+(s.percentage||0),0) / subs.length
+        const rounded = Math.round(avg*10)/10
+        row.push(`${rounded}%`)
+        totalPct += rounded; countPct++
+      } else {
+        row.push('—')
+      }
+    })
+    row.push(countPct ? `${Math.round(totalPct/countPct*10)/10}%` : '—')
+    return row
+  })
+
+  doc.autoTable({
+    head, body,
+    startY: 46,
+    styles: { fontSize: 8, cellPadding: 3 },
+    headStyles: { fillColor: GMU_NAVY, textColor: 255, fontStyle:'bold' },
+    alternateRowStyles: { fillColor: [245,248,252] },
+    columnStyles: {
+      0: { cellWidth: 28 },
+      1: { cellWidth: 45 },
+      2: { cellWidth: 38 },
+    },
+    margin: { left:14, right:14 },
+    didParseCell: (data) => {
+      if (data.section==='body' && data.column.index >= 3) {
+        const val = parseFloat(data.cell.raw)
+        if (!isNaN(val)) {
+          if (val >= 75) data.cell.styles.textColor = [22,101,52]
+          else if (val >= 50) data.cell.styles.textColor = [146,64,14]
+          else data.cell.styles.textColor = [153,27,27]
+        }
+      }
+    }
+  })
+
+  // Signature
+  const finalY = doc.lastAutoTable.finalY + 12
+  const sigY   = Math.min(finalY, pageH - 28)
+  doc.setDrawColor(...GMU_GOLD); doc.setLineWidth(0.8)
+  doc.line(14, sigY, 70, sigY)
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...GMU_NAVY)
+  doc.text('Dr. Salma Elnour', 14, sigY+6)
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(100,100,100)
+  doc.text('Thesis Coordinator · Gulf Medical University', 14, sigY+11)
+
+  const pages = doc.internal.getNumberOfPages()
+  for (let i=1;i<=pages;i++) {
+    doc.setPage(i)
+    doc.setFontSize(7); doc.setTextColor(150,150,150)
+    doc.text(`Page ${i} of ${pages}`, pageW/2, pageH-5, {align:'center'})
+  }
+
+  doc.save(`cohort-results-${cohortYear}-${new Date().toISOString().slice(0,10)}.pdf`)
+}
+
+function generateCohortCSV(cohortYear, students, allSubs) {
+  const assessTypes  = ['proposal_defense','progress_1','progress_2','defense_before','defense_after']
+  const shortLabels  = ['Proposal Defense','First Progress Report','Second Progress Report','Defense Before','Defense After']
+  const headers = ['Reg No.','Student Name','Email','Cohort','Supervisor',...shortLabels,'Overall Average']
+  const rows = students.map(student => {
+    const row = [
+      student.student_id||'', student.name, student.email||'',
+      student.enrollment_year||'', student.supervisors?.name||'',
+    ]
+    let totalPct=0, countPct=0
+    assessTypes.forEach(aType => {
+      const subs = allSubs.filter(s=>s.student_id===student.id&&s.assessment_type===aType&&s.total_score!==null)
+      if (subs.length) {
+        const avg = subs.reduce((a,s)=>a+(s.percentage||0),0) / subs.length
+        row.push((Math.round(avg*10)/10).toString())
+        totalPct += Math.round(avg*10)/10; countPct++
+      } else {
+        row.push('')
+      }
+    })
+    row.push(countPct ? (Math.round(totalPct/countPct*10)/10).toString() : '')
+    return row
+  })
+
+  const csv = [headers, ...rows].map(r =>
+    r.map(v => v.includes(',') || v.includes('"') ? `"${v.replace(/"/g,'""')}"` : v).join(',')
+  ).join('\n')
+
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'}))
+  a.download = `cohort-results-${cohortYear}-${new Date().toISOString().slice(0,10)}.csv`
+  a.click()
+}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const ASSESSMENT_TYPES = [
@@ -993,6 +1308,20 @@ Gulf Medical University`,
       report += `\n`
     })
 
+    if (type === 'pdf') {
+      try {
+        await generateIndividualPDF(student, selType, subs, avg,
+          (asgn) => {
+            if (!asgn) return '—'
+            if (asgn.examiner_type==='external') return asgn.external_examiners?.name||'—'
+            return supervisors.find(s=>s.id===asgn.examiner_id)?.name||'—'
+          },
+          supervisors
+        )
+      } catch(e) { setEmailResult({ ok:false, msg:'PDF generation failed: '+e.message }) }
+      return
+    }
+
     if (type === 'student') {
       setEmailSending('student')
       try {
@@ -1020,13 +1349,6 @@ Gulf Medical University`,
         setEmailResult({ ok: true, msg: `Report sent to ${sup.email}` })
       } catch(e) { setEmailResult({ ok: false, msg: e.message }) }
       setEmailSending(null)
-    } else {
-      // Download as text
-      const blob = new Blob([report], { type: 'text/plain' })
-      const a = document.createElement('a')
-      a.href = URL.createObjectURL(blob)
-      a.download = `assessment-${student.student_id}-${selType}-${new Date().toISOString().slice(0,10)}.txt`
-      a.click()
     }
   }
 
@@ -1200,8 +1522,9 @@ Gulf Medical University`,
                 <Unlock size={13}/> Unlock All
               </button>
               <div className="w-px h-6 bg-navy-700/50 self-center mx-1"/>
-              <button onClick={()=>sendReport('download')} className="btn-secondary text-xs">
-                <Download size={13}/> Download Report
+              <button onClick={()=>sendReport('pdf')} disabled={emailSending==='pdf'} className="btn-secondary text-xs disabled:opacity-50">
+                {emailSending==='pdf'?<Loader2 size={13} className="animate-spin"/>:<FileText size={13}/>}
+                Download PDF
               </button>
               <button onClick={()=>sendReport('student')} disabled={emailSending==='student'} className="btn-secondary text-xs disabled:opacity-50">
                 {emailSending==='student'?<Loader2 size={13} className="animate-spin"/>:<Send size={13}/>}
@@ -1222,6 +1545,54 @@ Gulf Medical University`,
           </div>
         </>
       )}
+
+      {/* Cohort results */}
+      <CohortResultsSection students={students} submissions={submissions} cohort={students[0]?.enrollment_year||''}/>
+    </div>
+  )
+}
+
+function CohortResultsSection({ students, submissions, cohort }) {
+  const [generating, setGenerating] = useState(false)
+  const cohortYear = students[0]?.enrollment_year || 'All'
+  const { supabase: _ } = { supabase: null } // placeholder
+
+  async function downloadCohortPDF() {
+    setGenerating('pdf')
+    try {
+      const { supabase } = await import('../lib/supabase')
+      const { data: sups } = await supabase.from('supervisors').select('*')
+      await generateCohortPDF(cohortYear, students, submissions, sups||[])
+    } catch(e) { alert('PDF failed: '+e.message) }
+    setGenerating(null)
+  }
+
+  function downloadCohortCSV() {
+    generateCohortCSV(cohortYear, students, submissions)
+  }
+
+  return (
+    <div className="card p-5 border-gold-500/20">
+      <h3 className="font-display font-semibold text-slate-100 mb-1 text-sm flex items-center gap-2">
+        <FileSpreadsheet size={14} className="text-gold-400"/> Cohort Results — {cohortYear}
+      </h3>
+      <p className="text-xs text-navy-400 mb-4 leading-relaxed">
+        Download all students' final marks averaged from both examiners. PDF for sharing, CSV for uploading to Moodle.
+      </p>
+      <div className="flex gap-2">
+        <button onClick={downloadCohortPDF} disabled={generating==='pdf'||!students.length}
+          className="btn-primary disabled:opacity-50 text-xs">
+          {generating==='pdf'?<Loader2 size={13} className="animate-spin"/>:<FileText size={13}/>}
+          {generating==='pdf'?'Generating…':'Download Cohort PDF'}
+        </button>
+        <button onClick={downloadCohortCSV} disabled={!students.length}
+          className="btn-secondary text-xs disabled:opacity-50">
+          <FileSpreadsheet size={13}/> Download CSV for Moodle
+        </button>
+      </div>
+      <p className="text-xs text-navy-600 mt-2">
+        CSV columns: Reg No., Student Name, Email, Cohort, Supervisor, score per assessment, Overall Average
+      </p>
     </div>
   )
 }
