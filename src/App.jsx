@@ -13,6 +13,7 @@ import Analytics from './pages/Analytics'
 import CalendarPage from './pages/CalendarPage'
 import Deadlines from './pages/Deadlines'
 import Assessments from './pages/Assessments'
+import ExaminerResponse from './pages/ExaminerResponse'
 import StudentCheckin from './pages/StudentCheckin'
 import Respond from './pages/Respond'
 
@@ -46,7 +47,8 @@ export default function App() {
         <Route path="/analytics"  element={<Layout><Analytics /></Layout>} />
         <Route path="/calendar"   element={<Layout><CalendarPage /></Layout>} />
         <Route path="/deadlines"  element={<Layout><Deadlines /></Layout>} />
-        <Route path="/assessments" element={<Layout><Assessments /></Layout>} />
+        <Route path="/assessments"       element={<Layout><Assessments /></Layout>} />
+        <Route path="/examiner-response"  element={<ExaminerResponse />} />
         <Route path="/student-checkin" element={<StudentCheckin />} />
         <Route path="/settings" element={<Layout><Settings /></Layout>} />
       </Routes>
