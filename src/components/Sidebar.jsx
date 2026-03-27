@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import {
-  LayoutDashboard, Users, Mail, Settings, GraduationCap, Bell, FileText, ClipboardList, TrendingUp, Calendar, Clock, UserCheck
+  LayoutDashboard, Users, Mail, Settings, GraduationCap, Bell, FileText, ClipboardList, TrendingUp, Calendar, Clock, Award
 } from 'lucide-react'
 
 const NAV = [
@@ -13,7 +13,7 @@ const NAV = [
   { to: '/deadlines', icon: Clock,        label: 'Deadlines'   },
   { to: '/analytics', icon: TrendingUp,   label: 'Analytics'   },
   { to: '/calendar',  icon: Calendar,     label: 'Calendar'    },
-  { to: '/examiners',  icon: UserCheck,    label: 'Examiners'   },
+  { to: '/assessments', icon: Award, label: 'Assessments' },
   { to: '/settings', icon: Settings,        label: 'Settings'  },
 ]
 
