@@ -14,7 +14,6 @@ import {
   lockSubmission, getAllSubmissions
 } from '../lib/supabase'
 import { sendStudentEmail, sendSupervisorEmail } from '../lib/emailService'
-import { sendStudentEmail } from '../lib/emailService'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const ASSESSMENT_TYPES = [
