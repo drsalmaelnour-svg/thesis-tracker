@@ -449,3 +449,8 @@ export function getExaminerResponseLink(token) {
   const base = window.location.origin + window.location.pathname.split('#')[0].replace(/\/$/, '')
   return `${base}/#/examiner-response?t=${token}`
 }
+
+export function getExaminerPortalLink(token) {
+  const base = window.location.origin + window.location.pathname.split('#')[0].replace(/\/$/, '')
+  return `${base}/#/examiner-portal?t=${token}`
+}

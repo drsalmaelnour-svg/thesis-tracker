@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { CheckCircle2, XCircle, Loader2, GraduationCap, Send, Shield } from 'lucide-react'
 
 // ── Rubric data ───────────────────────────────────────────────────────────────
@@ -154,8 +154,8 @@ const SCORE_COLORS = {
 }
 
 export default function ExaminerResponse() {
-  const [params] = useSearchParams()
-  const token    = params.get('t')
+  const location = useLocation()
+  const token    = new URLSearchParams(location.search).get('t')
 
   const [stage,      setStage]      = useState('loading')
   const [assignment, setAssignment] = useState(null)
@@ -328,13 +328,13 @@ export default function ExaminerResponse() {
   if (!formDef) return null
 
   return (
-    <div className="min-h-screen py-8 px-4" style={{background:'linear-gradient(135deg,#0f1f36 0%,#1e3a5f 60%,#0f1f36 100%)'}}>
-      <div className="max-w-3xl mx-auto space-y-0">
+    <div className="min-h-screen py-8 px-4" style={{background:'#f1f5f9'}}>
+      <div className="max-w-3xl mx-auto space-y-0" style={{background:'#fff',borderRadius:'16px',boxShadow:'0 4px 24px rgba(0,0,0,0.08)',overflow:'hidden'}}>
 
         {/* Form header */}
         <div className="bg-white/5 border border-white/10 rounded-t-3xl overflow-hidden">
           <div className="px-8 py-6 border-b border-white/10" style={{background:'linear-gradient(135deg,#1e3a5f,#254474)'}}>
-            <p className="text-xs text-amber-400/70 uppercase tracking-wider mb-1">Gulf Medical University · MSc Medical Laboratory Sciences</p>
+            <p style={{fontSize:'10px',color:'#d4a843',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:'4px',opacity:0.9}}>Gulf Medical University · MSc Medical Laboratory Sciences</p>
             <h1 className="text-white font-bold text-xl">{formDef.title}</h1>
             <div className="flex gap-2 mt-2 flex-wrap">
               <span className="text-xs px-2 py-0.5 rounded-lg border border-blue-400/30 bg-blue-500/10 text-blue-300">{formDef.course}</span>
@@ -345,7 +345,7 @@ export default function ExaminerResponse() {
           </div>
 
           {/* Pre-filled student + examiner info */}
-          <div className="grid grid-cols-2 gap-0">
+          <div className="grid grid-cols-2 gap-0" style={{background:'#f8fafc'}}>
             {[
               ['Student', student?.name],
               ['Registration No.', student?.student_id],
@@ -354,39 +354,39 @@ export default function ExaminerResponse() {
               ['Date of Assessment', group?.date ? new Date(group.date).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}) : new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})],
               ['Group & Time', group ? `Group ${group.group_name} — ${group.time_slot||''}` : '—'],
             ].map(([label, val]) => (
-              <div key={label} className="px-6 py-3 border-b border-r border-white/10">
-                <p className="text-xs text-slate-500 uppercase tracking-wider mb-0.5">{label}</p>
-                <p className="text-sm text-white font-medium">{val || '—'}</p>
+              <div key={label} style={{padding:'10px 24px',borderBottom:'1px solid #e2e8f0',borderRight:'1px solid #e2e8f0'}}>
+                <p style={{fontSize:'10px',color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'2px'}}>{label}</p>
+                <p style={{fontSize:'13px',color:'#1e293b',fontWeight:600}}>{val || '—'}</p>
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-3 gap-0 border-b border-white/10">
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',background:'#f8fafc',borderBottom:'1px solid #e2e8f0'}}>
             {[
               ['Examiner Name', examiner?.name],
               ['Designation', examiner?.designation],
               ['Role', assignment?.examiner_type === 'external' ? 'External Examiner' : 'Internal Examiner'],
             ].map(([label, val]) => (
-              <div key={label} className="px-6 py-3 border-r border-white/10 last:border-r-0">
-                <p className="text-xs text-slate-500 uppercase tracking-wider mb-0.5">{label}</p>
-                <p className="text-sm text-white font-medium">{val || '—'}</p>
+              <div key={label} style={{padding:'10px 24px',borderRight:'1px solid #e2e8f0'}}>
+                <p style={{fontSize:'10px',color:'#94a3b8',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'2px'}}>{label}</p>
+                <p style={{fontSize:'13px',color:'#1e293b',fontWeight:600}}>{val || '—'}</p>
               </div>
             ))}
           </div>
 
           {/* Confidentiality notice */}
-          <div className="px-6 py-3 flex items-center gap-2.5 border-b border-white/10 bg-white/[0.02]">
-            <Shield size={13} className="text-amber-400 shrink-0"/>
-            <p className="text-xs text-slate-400">This evaluation is <strong className="text-slate-300">strictly confidential</strong>. Your responses will not be shared with other examiners or the student directly.</p>
+          <div style={{padding:'10px 24px',display:'flex',alignItems:'center',gap:'10px',background:'#fefce8',borderBottom:'1px solid #fde047'}}>
+            <Shield size={13} style={{color:'#92400e',flexShrink:0}}/>
+            <p style={{fontSize:'11px',color:'#78350f'}}>This evaluation is <strong>strictly confidential</strong>. Your responses will not be shared with other examiners or the student directly.</p>
           </div>
         </div>
 
         {/* Scoring scale (for scored forms) */}
         {!isFormative && (
-          <div className="grid grid-cols-4 border-x border-white/10 bg-white/[0.02]">
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',background:'#f8fafc',borderTop:'1px solid #e2e8f0',borderBottom:'1px solid #e2e8f0'}}>
             {[4,3,2,1].map((v,vi) => (
-              <div key={v} className="px-4 py-3 border-r border-white/10 last:border-r-0 text-center">
-                <p className="text-lg font-bold" style={{color:SCORE_COLORS[v].num}}>{v}</p>
-                <p className="text-xs text-slate-400">{SCORE_LABELS[vi]}</p>
+              <div key={v} style={{padding:'10px 16px',borderRight:'1px solid #e2e8f0',textAlign:'center'}}>
+                <p style={{fontSize:'18px',fontWeight:700,color:SCORE_COLORS[v].num}}>{v}</p>
+                <p style={{fontSize:'11px',color:'#64748b'}}>{SCORE_LABELS[vi]}</p>
               </div>
             ))}
           </div>
@@ -394,32 +394,33 @@ export default function ExaminerResponse() {
 
         {/* Scored form sections */}
         {!isFormative && formDef.sections.map((sec, si) => (
-          <div key={si} className="border-x border-b border-white/10">
-            <div className="px-6 py-3 bg-white/[0.04] flex justify-between items-center border-b border-white/10">
-              <p className="text-xs font-bold text-slate-300 uppercase tracking-wider">{sec.title}</p>
-              <p className="text-xs font-bold text-blue-300">{totals.sections?.[sec.title]||0} / {sec.criteria.length*4}</p>
+          <div key={si} style={{borderBottom:'1px solid #e2e8f0'}}>
+            <div style={{padding:'8px 24px',background:'#1e3a5f',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <p style={{fontSize:'11px',fontWeight:700,color:'#fff',textTransform:'uppercase',letterSpacing:'0.07em'}}>{sec.title}</p>
+              <p style={{fontSize:'12px',fontWeight:700,color:'#d4a843'}}>{totals.sections?.[sec.title]||0} / {sec.criteria.length*4}</p>
             </div>
             {sec.criteria.map((c, ci) => (
               <div key={ci} className="border-b border-white/10 last:border-b-0">
-                <div className="px-6 py-3">
-                  <p className="text-sm font-semibold text-white mb-0.5">{c.name}</p>
-                  <p className="text-xs text-slate-400">{c.sub}</p>
+                <div style={{padding:'12px 24px 4px',borderTop:'1px solid #f1f5f9'}}>
+                  <p style={{fontSize:'13px',fontWeight:600,color:'#1e293b',marginBottom:'2px'}}>{c.name}</p>
+                  <p style={{fontSize:'11px',color:'#64748b'}}>{c.sub}</p>
                 </div>
-                <div className="grid grid-cols-4 gap-3 px-6 pb-4">
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:'8px',padding:'8px 24px 16px'}}>
                   {[4,3,2,1].map((v,vi) => {
                     const sel = scores[c.name] === v
                     const col = SCORE_COLORS[v]
                     return (
                       <button key={v} type="button"
                         onClick={() => setScores(s=>({...s,[c.name]:v}))}
-                        className="text-left p-3 rounded-xl border-2 transition-all"
                         style={{
-                          borderColor: sel ? col.border : 'rgba(255,255,255,0.1)',
-                          background:  sel ? col.bg : 'rgba(255,255,255,0.03)',
+                          display:'block',textAlign:'left',padding:'10px',borderRadius:'10px',
+                          border: sel ? `2px solid ${col.border}` : '1.5px solid #e2e8f0',
+                          background: sel ? col.bg : '#fafafa',
+                          cursor:'pointer',transition:'all 0.12s',width:'100%'
                         }}>
-                        <p className="text-base font-bold mb-1" style={{color: sel?col.num:'rgba(255,255,255,0.6)'}}>{v}</p>
-                        <p className="text-xs font-semibold mb-1.5" style={{color: sel?col.text:'rgba(148,163,184,1)'}}>{SCORE_LABELS[vi]}</p>
-                        <p className="text-xs leading-relaxed" style={{color: sel?col.text:'rgba(100,116,139,1)'}}>{c.descs[vi]}</p>
+                        <p style={{fontSize:'16px',fontWeight:700,marginBottom:'3px',color:sel?col.num:'#94a3b8'}}>{v}</p>
+                        <p style={{fontSize:'10px',fontWeight:600,marginBottom:'4px',color:sel?col.text:'#64748b'}}>{SCORE_LABELS[vi]}</p>
+                        <p style={{fontSize:'10px',lineHeight:'1.4',color:sel?col.text:'#94a3b8'}}>{c.descs[vi]}</p>
                       </button>
                     )
                   })}
@@ -431,23 +432,24 @@ export default function ExaminerResponse() {
 
         {/* Formative checklist */}
         {isFormative && (
-          <div className="border-x border-b border-white/10">
-            <div className="px-6 py-3 bg-white/[0.04] border-b border-white/10">
-              <p className="text-xs font-bold text-slate-300 uppercase tracking-wider">Section A — Thesis Readiness Checklist</p>
+          <div style={{borderBottom:'1px solid #e2e8f0'}}>
+            <div style={{padding:'8px 24px',background:'#1e3a5f'}}>
+              <p style={{fontSize:'11px',fontWeight:700,color:'#fff',textTransform:'uppercase',letterSpacing:'0.07em'}}>Section A — Thesis Readiness Checklist</p>
             </div>
             {formDef.checklistItems.map((item, ii) => (
-              <div key={ii} className="border-b border-white/10 last:border-b-0">
-                <div className="px-6 py-3 flex items-center justify-between gap-4">
-                  <p className="text-sm text-white">{ii+1}. {item}</p>
+              <div key={ii} style={{borderBottom:'1px solid #f1f5f9'}}>
+                <div style={{padding:'10px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:'16px'}}>
+                  <p style={{fontSize:'13px',color:'#1e293b'}}>{ii+1}. {item}</p>
                   <div className="flex gap-2 shrink-0">
                     {[['ok','Satisfactory','#dcfce7','#166534'],['ni','Needs Improvement','#fee2e2','#991b1b']].map(([v,l,bg,col])=>(
                       <button key={v} type="button"
                         onClick={()=>setChecks(c=>({...c,[item]:v}))}
-                        className="px-3 py-1.5 rounded-xl border-2 text-xs font-semibold transition-all"
                         style={{
-                          borderColor: checks[item]===v ? col : 'rgba(255,255,255,0.15)',
-                          background:  checks[item]===v ? bg  : 'transparent',
-                          color:       checks[item]===v ? col : 'rgba(148,163,184,1)',
+                          padding:'5px 14px',borderRadius:'20px',border:'1.5px solid',
+                          borderColor: checks[item]===v ? col : '#e2e8f0',
+                          background:  checks[item]===v ? bg  : '#fff',
+                          color:       checks[item]===v ? col : '#94a3b8',
+                          fontSize:'11px',fontWeight:600,cursor:'pointer',transition:'all 0.12s'
                         }}>
                         {l}
                       </button>
@@ -462,7 +464,7 @@ export default function ExaminerResponse() {
                     </div>
                     <textarea
                       className="w-full rounded-xl px-4 py-3 text-sm text-white resize-none leading-relaxed"
-                      style={{background:'rgba(153,27,27,0.1)',border:'1.5px solid rgba(153,27,27,0.4)',minHeight:'80px'}}
+                      style={{background:'#fff5f5',border:'1.5px solid #fca5a5',minHeight:'80px',width:'100%',borderRadius:'10px',padding:'10px 14px',fontSize:'12px',color:'#1e293b',resize:'vertical',lineHeight:'1.5',outline:'none'}}
                       placeholder="Describe exactly what needs to be improved, including page numbers and specific sections…"
                       value={checkNotes[item]||''}
                       onChange={e=>setCheckNotes(n=>({...n,[item]:e.target.value}))}
@@ -476,21 +478,20 @@ export default function ExaminerResponse() {
 
         {/* Score total (scored forms) */}
         {!isFormative && (
-          <div className="border-x border-b border-white/10 px-6 py-4 flex items-center justify-between bg-white/[0.03]">
-            <p className="text-sm text-slate-300">Total Score</p>
-            <div className="flex items-center gap-3">
-              <p className="text-2xl font-bold text-white">{totals.total} / {totals.max}</p>
-              <span className="text-lg font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-3 py-1 rounded-xl">{totals.pct}%</span>
+          <div style={{padding:'14px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',background:'#1e3a5f'}}>
+            <p style={{fontSize:'13px',color:'#94a3b8',fontWeight:500}}>Total Score</p>
+            <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+              <p style={{fontSize:'22px',fontWeight:700,color:'#fff'}}>{totals.total} / {totals.max}</p>
+              <span style={{fontSize:'15px',fontWeight:700,color:'#d4a843',background:'rgba(212,168,67,0.15)',border:'1px solid rgba(212,168,67,0.4)',padding:'4px 14px',borderRadius:'12px'}}>{totals.pct}%</span>
             </div>
           </div>
         )}
 
         {/* Proposed submission date (progress 2 only) */}
         {formDef.hasProposedDate && (
-          <div className="border-x border-b border-white/10 px-6 py-4 bg-white/[0.02]">
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Proposed Thesis Submission Date</label>
-            <input type="date" className="w-full max-w-xs rounded-xl px-4 py-2 text-sm text-white outline-none"
-              style={{background:'rgba(255,255,255,0.08)',border:'1px solid rgba(255,255,255,0.15)'}}
+          <div style={{padding:'14px 24px',borderTop:'1px solid #e2e8f0',background:'#f8fafc'}}>
+            <label style={{display:'block',fontSize:'10px',fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:'8px'}}>Proposed Thesis Submission Date</label>
+            <input type="date" style={{maxWidth:'240px',borderRadius:'10px',padding:'8px 14px',fontSize:'13px',color:'#1e293b',border:'1px solid #cbd5e1',outline:'none',background:'#fff'}}
               value={proposedDate} onChange={e=>setProposedDate(e.target.value)}/>
           </div>
         )}
@@ -509,7 +510,7 @@ export default function ExaminerResponse() {
           />
           {isFormative && (
             <>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mt-4 mb-2">Questions for the Oral Defense Examination</label>
+              <label style={{display:'block',fontSize:'10px',fontWeight:700,color:'#64748b',textTransform:'uppercase',letterSpacing:'0.06em',marginTop:'16px',marginBottom:'4px'}}>Questions for the Oral Defense Examination</label>
               <textarea
                 className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 resize-none leading-relaxed outline-none"
                 style={{background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.15)',minHeight:'80px'}}
@@ -525,16 +526,16 @@ export default function ExaminerResponse() {
           <div className="grid grid-cols-2 gap-3">
             {formDef.recOptions.map(r => (
               <button key={r} type="button" onClick={()=>setRec(r)}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all"
                 style={{
-                  borderColor: recommendation===r ? '#d4a843' : 'rgba(255,255,255,0.1)',
-                  background:  recommendation===r ? 'rgba(212,168,67,0.1)' : 'rgba(255,255,255,0.02)',
+                  display:'flex',alignItems:'center',gap:'12px',padding:'12px 16px',borderRadius:'10px',
+                  border: recommendation===r ? '2px solid #d4a843' : '1.5px solid #e2e8f0',
+                  background: recommendation===r ? '#fefce8' : '#fff',
+                  cursor:'pointer',transition:'all 0.12s',textAlign:'left',width:'100%'
                 }}>
-                <div className="w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center"
-                  style={{borderColor: recommendation===r ? '#d4a843' : 'rgba(148,163,184,0.5)'}}>
-                  {recommendation===r && <div className="w-2 h-2 rounded-full bg-amber-400"/>}
+                <div style={{width:'16px',height:'16px',borderRadius:'50%',border:`2px solid ${recommendation===r?'#d4a843':'#cbd5e1'}`,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  {recommendation===r && <div style={{width:'8px',height:'8px',borderRadius:'50%',background:'#d4a843'}}/>}
                 </div>
-                <span className="text-sm font-medium" style={{color: recommendation===r ? '#d4a843' : 'rgba(203,213,225,1)'}}>{r}</span>
+                <span style={{fontSize:'13px',fontWeight:500,color:recommendation===r?'#92400e':'#475569'}}>{r}</span>
               </button>
             ))}
           </div>
@@ -557,7 +558,7 @@ export default function ExaminerResponse() {
           </div>
         </div>
 
-        <p className="text-center text-slate-600 text-xs pt-4">Thesis Coordination System · Gulf Medical University · {new Date().getFullYear()}</p>
+        <p style={{textAlign:'center',fontSize:'11px',color:'#94a3b8',paddingTop:'16px'}}>Thesis Coordination System · Gulf Medical University · {new Date().getFullYear()}</p>
       </div>
     </div>
   )
@@ -565,8 +566,8 @@ export default function ExaminerResponse() {
 
 function Shell({ children }) {
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{background:'linear-gradient(135deg,#0f1f36 0%,#1e3a5f 60%,#0f1f36 100%)'}}>
-      <div className="w-full max-w-lg bg-white/5 border border-white/10 rounded-3xl overflow-hidden shadow-2xl p-8">
+    <div className="min-h-screen flex items-center justify-center p-4" style={{background:'#f1f5f9'}}>
+      <div className="w-full max-w-lg bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xl p-8">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center">
             <GraduationCap size={20} className="text-amber-400"/>

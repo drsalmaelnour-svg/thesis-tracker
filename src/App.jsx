@@ -14,6 +14,7 @@ import CalendarPage from './pages/CalendarPage'
 import Deadlines from './pages/Deadlines'
 import Assessments from './pages/Assessments'
 import ExaminerResponse from './pages/ExaminerResponse'
+import ExaminerPortal from './pages/ExaminerPortal'
 import StudentCheckin from './pages/StudentCheckin'
 import Respond from './pages/Respond'
 
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="/deadlines"  element={<Layout><Deadlines /></Layout>} />
         <Route path="/assessments"       element={<Layout><Assessments /></Layout>} />
         <Route path="/examiner-response"  element={<ExaminerResponse />} />
+        <Route path="/examiner-portal"    element={<ExaminerPortal />} />
         <Route path="/student-checkin" element={<StudentCheckin />} />
         <Route path="/settings" element={<Layout><Settings /></Layout>} />
       </Routes>

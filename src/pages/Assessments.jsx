@@ -9,7 +9,7 @@ import {
   getStudentsWithProgress, getExternalExaminers,
   upsertExternalExaminer, deleteExternalExaminer,
   getAssessmentAssignments, upsertAssessmentAssignment,
-  getExaminerResponseLink, logActivity
+  getExaminerResponseLink, getExaminerPortalLink, logActivity
 } from '../lib/supabase'
 import { sendStudentEmail } from '../lib/emailService'
 
@@ -468,18 +468,70 @@ function AssignTab({ students, supervisors, externals, assignments, onRefresh, g
     const name    = getExaminerName(asgn)
     const email   = getExaminerEmail(asgn)
     const student = students.find(s=>s.id===asgn.student_id)
-    const link    = getExaminerResponseLink(asgn.token)
+    const link    = combined
+      ? getExaminerPortalLink(asgn.token)
+      : getExaminerResponseLink(asgn.token)
+
     if (combined) {
-      const afterA = assignments.find(a=>a.student_id===asgn.student_id&&a.assessment_type==='defense_after'&&a.examiner_number===asgn.examiner_number)
+      // Find the after assignment for same student + same examiner number
+      const afterA = assignments.find(a =>
+        a.student_id === asgn.student_id &&
+        a.assessment_type === 'defense_after' &&
+        a.examiner_number === asgn.examiner_number
+      )
       const linkAfter = afterA ? getExaminerResponseLink(afterA.token) : null
+
       setEmailSubject(`Thesis Defense Evaluation — ${student?.name||''} (${student?.student_id||''})`)
-      setEmailBody(`Dear ${name},\n\nYou have been assigned as an examiner for the Thesis Defense of:\n\nStudent: ${student?.name||''}\nRegistration No.: ${student?.student_id||''}\nSupervisor: ${student?.supervisors?.name||''}\n\nThis assignment covers two evaluation stages:\n\n── STAGE 1: DEFENSE BEFORE (Formative) ──\nComplete before the oral defense to assess thesis readiness.\nEvaluation link: ${link}\n\n── STAGE 2: DEFENSE AFTER (Final Scored) ──\nComplete after the defense and corrections are submitted.\n${linkAfter?`Evaluation link: ${linkAfter}`:'(Link will be provided when ready)'}\n\nAll student information is pre-filled. Your evaluations are strictly confidential.\n\nBest regards,\nDr. Salma Elnour\nThesis Coordinator\nGulf Medical University`)
-      setEmailModal({ asgn, name, email, link, linkAfter, combined:true })
+      setEmailBody(
+`Dear ${name},
+
+You have been assigned as an examiner for the Thesis Defense of the following student:
+
+Student:          ${student?.name||''}
+Registration No.: ${student?.student_id||''}
+Supervisor:       ${student?.supervisors?.name||''}
+
+Please click the button below to access your Thesis Evaluation Portal. You will find both evaluation stages in one place:
+
+  • Stage 1 — Defense Before (Formative)
+    Complete before the oral defense to assess thesis readiness.
+
+  • Stage 2 — Defense After (Final Scored)
+    Complete after the defense once corrections are submitted.
+
+All student information is pre-filled. Your evaluations are strictly confidential.
+
+Please do not hesitate to contact me if you have any questions.
+
+Best regards,
+Dr. Salma Elnour
+Thesis Coordinator
+Gulf Medical University`)
+      setEmailModal({ asgn, name, email, link, linkAfter, combined: true })
+
     } else {
       const typeName = ASSESSMENT_TYPES.find(t=>t.id===asgn.assessment_type)?.label||''
       setEmailSubject(`Thesis Assessment — ${typeName} — ${student?.name||''}`)
-      setEmailBody(`Dear ${name},\n\nYou have been assigned as an examiner for the ${typeName} of:\n\nStudent: ${student?.name||''}\nRegistration No.: ${student?.student_id||''}\nSupervisor: ${student?.supervisors?.name||''}\n\nPlease complete your evaluation using the link below. All information is pre-filled.\n\nEvaluation link: ${link}\n\nYour evaluation is strictly confidential.\n\nBest regards,\nDr. Salma Elnour\nThesis Coordinator\nGulf Medical University`)
-      setEmailModal({ asgn, name, email, link, combined:false })
+      setEmailBody(
+`Dear ${name},
+
+You have been assigned as an examiner for the ${typeName} of the following student:
+
+Student:          ${student?.name||''}
+Registration No.: ${student?.student_id||''}
+Supervisor:       ${student?.supervisors?.name||''}
+
+Please use the button below to access your evaluation form. All student information has been pre-filled for your convenience.
+
+Your evaluation is strictly confidential.
+
+Please complete this at your earliest convenience.
+
+Best regards,
+Dr. Salma Elnour
+Thesis Coordinator
+Gulf Medical University`)
+      setEmailModal({ asgn, name, email, link, combined: false })
     }
     setEmailSent(false)
   }
