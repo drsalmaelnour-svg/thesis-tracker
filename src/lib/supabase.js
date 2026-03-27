@@ -369,3 +369,83 @@ export async function getEmailTemplate(templateKey) {
     .from('email_templates').select('*').eq('template_key', templateKey).single()
   return data || null
 }
+
+// ── Assessment panel helpers ──────────────────────────────────────────────────
+
+export async function getExternalExaminers() {
+  const { data, error } = await supabase
+    .from('external_examiners').select('*').eq('active', true).order('name')
+  if (error) throw error
+  return data || []
+}
+
+export async function upsertExternalExaminer(examiner) {
+  const { error } = await supabase.from('external_examiners').upsert(examiner, { onConflict: 'email' })
+  if (error) throw error
+}
+
+export async function deleteExternalExaminer(id) {
+  const { error } = await supabase.from('external_examiners').update({ active: false }).eq('id', id)
+  if (error) throw error
+}
+
+export async function getAssessmentAssignments(filters = {}) {
+  let q = supabase.from('assessment_assignments').select(`
+    *,
+    students ( id, name, student_id, enrollment_year, supervisors(name) ),
+    external_examiners ( id, name, email, designation, institution )
+  `).order('assigned_at', { ascending: false })
+  if (filters.student_id)      q = q.eq('student_id', filters.student_id)
+  if (filters.assessment_type) q = q.eq('assessment_type', filters.assessment_type)
+  const { data, error } = await q
+  if (error) throw error
+  return data || []
+}
+
+export async function upsertAssessmentAssignment(assignment) {
+  const { data, error } = await supabase.from('assessment_assignments')
+    .upsert(assignment, { onConflict: 'student_id,assessment_type,examiner_number' })
+    .select().single()
+  if (error) throw error
+  return data
+}
+
+export async function getAssessmentSubmissions(studentId, assessmentType) {
+  const { data, error } = await supabase
+    .from('assessment_submissions')
+    .select('*, assessment_assignments(*)')
+    .eq('student_id', studentId)
+    .eq('assessment_type', assessmentType)
+  if (error) throw error
+  return data || []
+}
+
+export async function getAssessmentResult(studentId, assessmentType) {
+  const { data } = await supabase
+    .from('assessment_results')
+    .select('*')
+    .eq('student_id', studentId)
+    .eq('assessment_type', assessmentType)
+    .single()
+  return data || null
+}
+
+export async function finaliseAssessmentResult(studentId, assessmentType, sub1Id, sub2Id, avgScore, avgPct, recommendation) {
+  const { error } = await supabase.from('assessment_results').upsert({
+    student_id: studentId,
+    assessment_type: assessmentType,
+    examiner1_submission_id: sub1Id,
+    examiner2_submission_id: sub2Id,
+    average_score: avgScore,
+    average_pct: avgPct,
+    recommendation,
+    confirmed_at: new Date().toISOString(),
+    finalised: true,
+  }, { onConflict: 'student_id,assessment_type' })
+  if (error) throw error
+}
+
+export function getExaminerResponseLink(token) {
+  const base = window.location.origin + window.location.pathname.split('#')[0].replace(/\/$/, '')
+  return `${base}/#/examiner-response?t=${token}`
+}
