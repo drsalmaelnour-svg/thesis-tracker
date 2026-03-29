@@ -1,0 +1,68 @@
+# COPYRIGHT NOTICES — Dr Salma Elnour
+# Thesis Coordination System
+# Add these to the appropriate locations in your project.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. README.md — Add at the very bottom
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+---
+
+## License & Copyright
+
+© 2025 Dr Salma Elnour. All rights reserved.
+
+This project is proprietary software. Viewing this repository does not grant any
+rights to use, copy, modify, or distribute the code. See [LICENSE](./LICENSE) for details.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. App Footer — Add to your Footer component (JSX)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+<footer style={{ textAlign: 'center', padding: '1rem', fontSize: '0.75rem', color: '#6b7280' }}>
+  © {new Date().getFullYear()} Dr Salma Elnour. All rights reserved. |{' '}
+  Thesis Coordination System — Proprietary Software
+</footer>
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. Source File Header — Paste at the top of key .jsx / .js files
+   (especially App.jsx, main.jsx, and any core logic files)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/**
+ * Thesis Coordination System
+ * © 2025 Dr Salma Elnour. All rights reserved.
+ *
+ * This file is part of proprietary software owned by Dr Salma Elnour.
+ * Unauthorised copying, modification, or distribution is strictly prohibited.
+ * See LICENSE for full terms.
+ */
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. About / Settings Page (UI text block)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Thesis Coordination System
+Version 1.0 | Gulf Medical University
+
+Developed and owned by Dr Salma Elnour
+Associate Professor, Department of Medical Laboratory Sciences
+Gulf Medical University, UAE
+
+© 2025 Dr Salma Elnour. All rights reserved.
+This software is proprietary. Unauthorised use or distribution is prohibited.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. Git Commit Message — Use when you push these changes
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+chore: add proprietary LICENSE and copyright notices
+
+- Added LICENSE file asserting all rights reserved (© 2025 Dr Salma Elnour)
+- Updated README with copyright section
+- Added copyright header to core source files
+- Added copyright footer to app UI
