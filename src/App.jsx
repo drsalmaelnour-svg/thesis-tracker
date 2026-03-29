@@ -1,3 +1,11 @@
+/**
+ * Thesis Coordination System
+ * © 2025 Dr Salma Elnour. All rights reserved.
+ *
+ * This file is part of proprietary software owned by Dr Salma Elnour.
+ * Unauthorised copying, modification, or distribution is strictly prohibited.
+ * See LICENSE for full terms.
+ */
 import { HashRouter, Routes, Route } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
