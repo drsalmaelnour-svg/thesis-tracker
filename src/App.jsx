@@ -65,3 +65,6 @@ export default function App() {
     </HashRouter>
   )
 }
+<footer style={{ textAlign: 'center', padding: '1rem', fontSize: '0.75rem', color: '#6b7280', marginTop: '2rem' }}>
+  © {new Date().getFullYear()} Dr Salma Elnour. All rights reserved. | Thesis Coordination System — Proprietary Software
+</footer>
