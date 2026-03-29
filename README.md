@@ -162,3 +162,12 @@ Each student has a unique `token` (UUID) stored in Supabase — changing it woul
 ## 🛡 Security Note
 
 This app uses Supabase's `anon` key with open Row Level Security policies — appropriate for a small coordinator-only deployment. For a larger or public-facing deployment, add Supabase Auth and restrict RLS policies to authenticated users.
+---
+
+## License & Copyright
+
+© 2025 Dr Salma Elnour. All rights reserved.
+
+This project is proprietary software. Viewing this repository does not grant any
+rights to use, copy, modify, or distribute the code. See [LICENSE](./LICENSE) for details.
+```
