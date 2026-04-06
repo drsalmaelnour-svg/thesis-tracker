@@ -213,6 +213,83 @@ export default function CheckinDetailModal({ checkin, type, onClose }) {
             {' at '}{new Date(checkin.submitted_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}
           </p>
 
+          {/* Resolution panel */}
+          <div className="border border-navy-700/40 rounded-2xl p-4 space-y-3 bg-navy-800/20">
+            <p className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Coordinator Status</p>
+
+            {/* Student status override */}
+            {isStudent && (
+              <div>
+                <label className="block text-xs text-navy-400 mb-1.5">
+                  Update student status <span className="text-navy-600 font-normal">(override original submission)</span>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { v:'',              label:'Keep original', cls:'border-navy-700/40 text-navy-500' },
+                    { v:'on_track',      label:'🟢 On Track',   cls:'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' },
+                    { v:'some_concerns', label:'🟡 Concerns',   cls:'border-amber-500/40 bg-amber-500/10 text-amber-300' },
+                    { v:'struggling',    label:'🔴 Struggling', cls:'border-red-500/40 bg-red-500/10 text-red-300' },
+                  ].map(opt => (
+                    <button key={opt.v} onClick={() => setOverrideStatus(opt.v)}
+                      className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium transition-all ${
+                        overrideStatus === opt.v ? opt.cls : 'border-navy-700/40 text-navy-600 hover:border-navy-600/60'
+                      }`}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {overrideStatus && overrideStatus !== checkin.overall_status && (
+                  <p className="text-xs text-navy-500 mt-1">
+                    Original: {checkin.overall_status === 'on_track' ? '🟢' : checkin.overall_status === 'some_concerns' ? '🟡' : '🔴'} — will be overridden in the dashboard
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Coordinator resolution status */}
+            <div className="flex gap-2">
+              {[
+                { v:'new',         label:'New',         color:'bg-blue-500/15 border-blue-500/40 text-blue-300' },
+                { v:'in_progress', label:'In Progress',  color:'bg-amber-500/15 border-amber-500/40 text-amber-300' },
+                { v:'resolved',    label:'Resolved',     color:'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' },
+              ].map(opt => (
+                <button key={opt.v} onClick={() => setCoordStatus(opt.v)}
+                  className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+                    coordStatus === opt.v ? opt.color : 'border-navy-700/40 text-navy-500 hover:border-navy-600/60'
+                  }`}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Note */}
+            <div>
+              <label className="block text-xs text-navy-400 mb-1.5">
+                {coordStatus === 'resolved' ? 'Resolution note — how was this resolved?' : 'Internal note (optional)'}
+              </label>
+              <textarea
+                className="input resize-none text-sm leading-relaxed"
+                style={{minHeight:'64px'}}
+                placeholder={coordStatus === 'resolved'
+                  ? 'Describe how this concern was resolved…'
+                  : 'Add an internal note about actions taken…'}
+                value={resNote}
+                onChange={e => setResNote(e.target.value)}
+              />
+            </div>
+
+            <button onClick={() => updateStatus(coordStatus)} disabled={savingStatus}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold border transition-all disabled:opacity-50 ${
+                statusSaved
+                  ? 'bg-emerald-900/20 border-emerald-700/40 text-emerald-300'
+                  : 'btn-primary'
+              }`}>
+              {savingStatus ? <Loader2 size={12} className="animate-spin"/> :
+               statusSaved  ? <CheckCircle2 size={12}/> : <Save size={12}/>}
+              {savingStatus ? 'Saving…' : statusSaved ? 'Saved!' : 'Save Status'}
+            </button>
+          </div>
+
           {/* Success message */}
           {sent && (
             <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-900/20 border border-emerald-700/40 text-emerald-300 text-sm">
