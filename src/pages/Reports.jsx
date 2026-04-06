@@ -343,13 +343,160 @@ function downloadCSV(rows, filename) {
   a.download = filename; a.click()
 }
 
-async function downloadExcel(rows, filename, sheetName) {
+async function downloadExcel(rows, filename, sheetName, subtitle = '') {
   await loadScript('https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js')
   const XLSX = window.XLSX
-  const ws = XLSX.utils.json_to_sheet(rows)
-  ws['!cols'] = Object.keys(rows[0]).map(k=>({ wch: Math.max(k.length+2, 18) }))
+  if (!rows.length) return
+
+  const headers   = Object.keys(rows[0])
+  const colCount  = headers.length
+  const dateStr   = new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' })
+
+  // Build worksheet data manually so we can add header rows
+  const wsData = []
+
+  // Row 1 — Institution
+  const r1 = Array(colCount).fill('')
+  r1[0] = 'GULF MEDICAL UNIVERSITY — MSc Medical Laboratory Sciences'
+  wsData.push(r1)
+
+  // Row 2 — Report title
+  const r2 = Array(colCount).fill('')
+  r2[0] = sheetName
+  wsData.push(r2)
+
+  // Row 3 — Subtitle / date / confidential
+  const r3 = Array(colCount).fill('')
+  r3[0] = subtitle || ''
+  r3[Math.max(0, colCount - 2)] = `Generated: ${dateStr}`
+  r3[colCount - 1] = 'CONFIDENTIAL'
+  wsData.push(r3)
+
+  // Row 4 — blank spacer
+  wsData.push(Array(colCount).fill(''))
+
+  // Row 5 — column headers
+  wsData.push(headers)
+
+  // Data rows
+  rows.forEach(row => wsData.push(headers.map(h => row[h] ?? '')))
+
+  // Row after data — blank
+  wsData.push(Array(colCount).fill(''))
+
+  // Signature rows
+  const sigRow1 = Array(colCount).fill(''); sigRow1[0] = 'Dr. Salma Elnour'
+  const sigRow2 = Array(colCount).fill(''); sigRow2[0] = 'Thesis Coordinator'
+  const sigRow3 = Array(colCount).fill(''); sigRow3[0] = 'Gulf Medical University'
+  wsData.push(sigRow1, sigRow2, sigRow3)
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData)
+
+  // ── Column widths ─────────────────────────────────────────────────────────
+  ws['!cols'] = headers.map(h => ({
+    wch: Math.max(h.length + 4, 16, Math.min(
+      50,
+      Math.max(...rows.map(r => String(r[h]||'').length), 0) + 2
+    ))
+  }))
+
+  // ── Merge cells for header rows ───────────────────────────────────────────
+  ws['!merges'] = [
+    { s:{r:0,c:0}, e:{r:0,c:colCount-1} }, // institution
+    { s:{r:1,c:0}, e:{r:1,c:colCount-1} }, // title
+  ]
+
+  // ── Cell styles ───────────────────────────────────────────────────────────
+  const navyFill  = { patternType:'solid', fgColor:{ rgb:'1E3A5F' } }
+  const goldFill  = { patternType:'solid', fgColor:{ rgb:'D4A843' } }
+  const lightFill = { patternType:'solid', fgColor:{ rgb:'F1F5F9' } }
+  const altFill   = { patternType:'solid', fgColor:{ rgb:'E8EFF7' } }
+
+  const whiteFont  = { bold:true, color:{ rgb:'FFFFFF' }, name:'Calibri', sz:11 }
+  const goldFont   = { bold:true, color:{ rgb:'D4A843' }, name:'Calibri', sz:13 }
+  const navyFont   = { bold:true, color:{ rgb:'1E3A5F' }, name:'Calibri', sz:10 }
+  const darkFont   = { color:{ rgb:'1E293B' }, name:'Calibri', sz:10 }
+  const mutedFont  = { color:{ rgb:'64748B' }, name:'Calibri', sz:9, italic:true }
+  const sigFont    = { bold:true, color:{ rgb:'1E3A5F' }, name:'Calibri', sz:10 }
+
+  const border = {
+    top:    { style:'thin', color:{ rgb:'CBD5E1' } },
+    bottom: { style:'thin', color:{ rgb:'CBD5E1' } },
+    left:   { style:'thin', color:{ rgb:'CBD5E1' } },
+    right:  { style:'thin', color:{ rgb:'CBD5E1' } },
+  }
+  const headerBorder = {
+    top:    { style:'medium', color:{ rgb:'D4A843' } },
+    bottom: { style:'medium', color:{ rgb:'D4A843' } },
+    left:   { style:'thin',   color:{ rgb:'1E3A5F' } },
+    right:  { style:'thin',   color:{ rgb:'1E3A5F' } },
+  }
+
+  function cellAddr(r, c) {
+    const col = c < 26
+      ? String.fromCharCode(65 + c)
+      : String.fromCharCode(64 + Math.floor(c/26)) + String.fromCharCode(65 + (c%26))
+    return `${col}${r+1}`
+  }
+
+  // Style row 0 — institution (navy bg, gold text)
+  for (let col=0; col<colCount; col++) {
+    const addr = cellAddr(0, col)
+    if (!ws[addr]) ws[addr] = { t:'s', v:'' }
+    ws[addr].s = { fill:navyFill, font: col===0 ? { bold:true, color:{rgb:'D4A843'}, name:'Calibri', sz:11 } : whiteFont, alignment:{ horizontal:'left', vertical:'center' } }
+  }
+
+  // Style row 1 — title (navy bg, white bold large)
+  for (let col=0; col<colCount; col++) {
+    const addr = cellAddr(1, col)
+    if (!ws[addr]) ws[addr] = { t:'s', v:'' }
+    ws[addr].s = { fill:navyFill, font:{ bold:true, color:{rgb:'FFFFFF'}, name:'Calibri', sz:14 }, alignment:{ horizontal:'left', vertical:'center' } }
+  }
+
+  // Style row 2 — subtitle (light bg, muted)
+  for (let col=0; col<colCount; col++) {
+    const addr = cellAddr(2, col)
+    if (!ws[addr]) ws[addr] = { t:'s', v:'' }
+    ws[addr].s = { fill:lightFill, font:mutedFont, alignment:{ horizontal: col >= colCount-2 ? 'right' : 'left', vertical:'center' } }
+  }
+
+  // Style row 4 — column headers (navy bg, white bold)
+  for (let col=0; col<colCount; col++) {
+    const addr = cellAddr(4, col)
+    if (!ws[addr]) ws[addr] = { t:'s', v:headers[col] }
+    ws[addr].s = { fill:navyFill, font:whiteFont, border:headerBorder, alignment:{ horizontal:'center', vertical:'center', wrapText:true } }
+  }
+
+  // Style data rows — alternating
+  const dataStart = 5
+  rows.forEach((row, ri) => {
+    const fill = ri % 2 === 0 ? { patternType:'none' } : altFill
+    for (let col=0; col<colCount; col++) {
+      const addr = cellAddr(dataStart + ri, col)
+      if (!ws[addr]) ws[addr] = { t:'s', v:'' }
+      ws[addr].s = { fill, font:darkFont, border, alignment:{ horizontal:'left', vertical:'center', wrapText:true } }
+    }
+  })
+
+  // Row heights
+  ws['!rows'] = wsData.map((_, i) => {
+    if (i === 0) return { hpt: 22 }
+    if (i === 1) return { hpt: 28 }
+    if (i === 2) return { hpt: 18 }
+    if (i === 4) return { hpt: 22 }
+    return { hpt: 18 }
+  })
+
+  // Style signature rows
+  const sigStart = 5 + rows.length + 1
+  ;[0,1,2].forEach(ri => {
+    const addr = cellAddr(sigStart + ri, 0)
+    if (!ws[addr]) ws[addr] = { t:'s', v:'' }
+    ws[addr].s = { font: ri === 0 ? sigFont : mutedFont }
+  })
+
   const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0,31))
+  XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31))
   XLSX.writeFile(wb, filename)
 }
 
@@ -592,7 +739,7 @@ export default function Reports() {
       const rows = getRows()
       if (!rows.length) { alert('No data to export.'); setGenerating(false); return }
       if (fmt==='csv')   downloadCSV(rows, fname('csv'))
-      if (fmt==='excel') await downloadExcel(rows, fname('xlsx'), getTitle())
+      if (fmt==='excel') await downloadExcel(rows, fname('xlsx'), getTitle(), getSubtitle())
       if (fmt==='pdf')   await downloadPDF(getTitle(), getSubtitle(), rows, fname('pdf'))
       if (fmt==='print') window.print()
     } catch(e) { alert('Export failed: '+(e.message||String(e))) }
