@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, Shield, Send, Loader2, Edit2, ChevronDown } from 'lucide-react'
+import { X, Shield, Send, Loader2, Edit2, ChevronDown, Save, CheckCircle2 } from 'lucide-react'
 import { sendStudentEmail, sendSupervisorEmail } from '../lib/emailService'
 
 const STUDENT_STATUS = {
@@ -51,6 +51,10 @@ export default function CheckinDetailModal({ checkin, type, onClose }) {
   const [draftBody, setDraftBody]     = useState('')
   const [sending, setSending]         = useState(false)
   const [sent, setSent]               = useState(false)
+  const [coordStatus, setCoordStatus] = useState(checkin.coordinator_status || 'new')
+  const [resNote,     setResNote]     = useState(checkin.resolution_note || '')
+  const [savingStatus, setSavingStatus] = useState(false)
+  const [statusSaved,  setStatusSaved]  = useState(false)
 
   const isStudent       = type === 'student'
   const studentName     = checkin.students?.name || ''
@@ -67,6 +71,23 @@ export default function CheckinDetailModal({ checkin, type, onClose }) {
   const statusCfg = isStudent
     ? STUDENT_STATUS[checkin.overall_status]
     : SUPERVISOR_STATUS[checkin.engagement_status]
+
+  async function updateStatus(newStatus) {
+    setSavingStatus(true)
+    try {
+      const { supabase } = await import('../lib/supabase')
+      const table = isStudent ? 'student_checkins' : 'supervisor_checkins'
+      await supabase.from(table).update({
+        coordinator_status: newStatus,
+        resolution_note:    resNote || null,
+        resolved_at:        newStatus === 'resolved' ? new Date().toISOString() : null,
+      }).eq('id', checkin.id)
+      setCoordStatus(newStatus)
+      setStatusSaved(true)
+      setTimeout(() => setStatusSaved(false), 2500)
+    } catch(e) { console.error(e) }
+    setSavingStatus(false)
+  }
 
   function openDraft(target) {
     setDraftTarget(target)

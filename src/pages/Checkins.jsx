@@ -17,6 +17,12 @@ const STUDENT_STATUS = {
   struggling:    { label: 'Struggling',     emoji: '🔴', color: 'bg-red-900/30 border-red-700/40 text-red-300'           },
 }
 
+const COORD_STATUS = {
+  new:         { label:'New',         dot:'bg-blue-400',    badge:'bg-blue-500/15 border-blue-500/40 text-blue-300'       },
+  in_progress: { label:'In Progress', dot:'bg-amber-400',   badge:'bg-amber-500/15 border-amber-500/40 text-amber-300'    },
+  resolved:    { label:'Resolved',    dot:'bg-emerald-400', badge:'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' },
+}
+
 const SUPERVISOR_STATUS = {
   on_track: { label: 'On Track',         emoji: '🟢', color: 'bg-emerald-900/30 border-emerald-700/40 text-emerald-300' },
   concerns: { label: 'Needs Attention',  emoji: '🟡', color: 'bg-amber-900/30 border-amber-700/40 text-amber-300'       },
@@ -50,6 +56,7 @@ export default function Checkins() {
   const [bulkSending, setBulkSending]     = useState(null) // 'students'|'supervisors'|null
   const [cohortFilter, setCohortFilter]   = useState('all')
   const [activeTab, setActiveTab]         = useState('overview')
+  const [statusFilter, setStatusFilter]   = useState('active') // 'active' | 'resolved'
   const [selectedCheckin, setSelectedCheckin] = useState(null)
   const [checkinType, setCheckinType]     = useState('student') // overview|students|supervisors
 
@@ -226,6 +233,32 @@ export default function Checkins() {
 
       {/* ── OVERVIEW TAB ── */}
       {activeTab === 'overview' && (
+        {/* Status filter */}
+        <div className="flex items-center gap-2">
+          {[
+            { v:'active',   label:'Active',   count: stuCheckins.filter(c=>c.coordinator_status!=='resolved').length + supCheckins.filter(c=>c.coordinator_status!=='resolved').length },
+            { v:'resolved', label:'Resolved', count: stuCheckins.filter(c=>c.coordinator_status==='resolved').length + supCheckins.filter(c=>c.coordinator_status==='resolved').length },
+          ].map(opt => (
+            <button key={opt.v} onClick={() => setStatusFilter(opt.v)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-all ${
+                statusFilter===opt.v
+                  ? 'border-gold-500/40 bg-gold-500/10 text-gold-300'
+                  : 'border-navy-700/40 text-navy-400 hover:text-slate-300'
+              }`}>
+              {opt.label}
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${statusFilter===opt.v?'bg-gold-500/20 text-gold-400':'bg-navy-700/60 text-navy-500'}`}>
+                {opt.count}
+              </span>
+            </button>
+          ))}
+          {statusFilter === 'active' && stuCheckins.filter(c=>c.coordinator_status==='new'&&c.overall_status==='struggling').length > 0 && (
+            <span className="flex items-center gap-1.5 text-xs text-red-300 bg-red-900/20 border border-red-700/40 px-3 py-1.5 rounded-xl ml-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse inline-block"/>
+              {stuCheckins.filter(c=>c.coordinator_status==='new'&&c.overall_status==='struggling').length} struggling — not yet reviewed
+            </span>
+          )}
+        </div>
+
         <div className="grid grid-cols-2 gap-6">
           {/* Student latest check-ins */}
           <div className="card p-5">
@@ -236,7 +269,11 @@ export default function Checkins() {
               <p className="text-sm text-navy-500">No student check-ins yet.</p>
             ) : (
               <div className="space-y-3 max-h-96 overflow-y-auto">
-                {stuCheckins.slice(0,8).map(c => {
+                {stuCheckins
+                  .filter(c => statusFilter==='resolved'
+                    ? c.coordinator_status==='resolved'
+                    : c.coordinator_status!=='resolved')
+                  .slice(0,8).map(c => {
                   const cfg = STUDENT_STATUS[c.overall_status]
                   return (
                     <div key={c.id}
@@ -253,7 +290,14 @@ export default function Checkins() {
                       <p className="text-xs opacity-80">{WRITING_LABELS[c.writing_status] || ''}</p>
                       {c.challenges && <p className="text-xs opacity-70 mt-1 line-clamp-1">⚠ {c.challenges}</p>}
                       {c.support_needed && <p className="text-xs opacity-70 mt-0.5 line-clamp-1">→ {c.support_needed}</p>}
-                      <p className="text-xs opacity-50 mt-1.5">{formatDistanceToNow(new Date(c.submitted_at), {addSuffix:true})}</p>
+                      <div className="flex items-center justify-between mt-1.5">
+                        <p className="text-xs opacity-50">{formatDistanceToNow(new Date(c.submitted_at), {addSuffix:true})}</p>
+                        {c.coordinator_status && c.coordinator_status !== 'new' && (
+                          <span className={`text-xs px-1.5 py-0.5 rounded-lg border font-medium ${COORD_STATUS[c.coordinator_status]?.badge}`}>
+                            {COORD_STATUS[c.coordinator_status]?.label}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs opacity-40 mt-1">Click to read full response →</p>
                     </div>
                   )
@@ -271,7 +315,11 @@ export default function Checkins() {
               <p className="text-sm text-navy-500">No supervisor check-ins yet.</p>
             ) : (
               <div className="space-y-3 max-h-96 overflow-y-auto">
-                {supCheckins.slice(0,8).map(c => {
+                {supCheckins
+                  .filter(c => statusFilter==='resolved'
+                    ? c.coordinator_status==='resolved'
+                    : c.coordinator_status!=='resolved')
+                  .slice(0,8).map(c => {
                   const cfg = SUPERVISOR_STATUS[c.engagement_status]
                   return (
                     <div key={c.id}
@@ -290,9 +338,14 @@ export default function Checkins() {
                       {c.recommended_action && c.recommended_action !== 'No action needed' && (
                         <p className="text-xs font-medium mt-1 opacity-90">→ {c.recommended_action}</p>
                       )}
-                      <p className="text-xs opacity-50 mt-1.5">
-                        {c.supervisors?.name} · {formatDistanceToNow(new Date(c.submitted_at), {addSuffix:true})}
-                      </p>
+                      <div className="flex items-center justify-between mt-1.5">
+                        <p className="text-xs opacity-50">{c.supervisors?.name} · {formatDistanceToNow(new Date(c.submitted_at), {addSuffix:true})}</p>
+                        {c.coordinator_status && c.coordinator_status !== 'new' && (
+                          <span className={`text-xs px-1.5 py-0.5 rounded-lg border font-medium ${COORD_STATUS[c.coordinator_status]?.badge}`}>
+                            {COORD_STATUS[c.coordinator_status]?.label}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs opacity-40 mt-1">Click to read full response →</p>
                     </div>
                   )
