@@ -233,6 +233,7 @@ export default function Checkins() {
 
       {/* ── OVERVIEW TAB ── */}
       {activeTab === 'overview' && (
+        <div className="space-y-5">
         {/* Status filter */}
         <div className="flex items-center gap-2">
           {[
@@ -353,6 +354,7 @@ export default function Checkins() {
               </div>
             )}
           </div>
+        </div>
         </div>
       )}
 
