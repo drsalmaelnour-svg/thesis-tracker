@@ -275,7 +275,8 @@ export default function Checkins() {
                     ? c.coordinator_status==='resolved'
                     : c.coordinator_status!=='resolved')
                   .slice(0,8).map(c => {
-                  const cfg = STUDENT_STATUS[c.overall_status]
+                  const effectiveStatus = c.override_status || c.overall_status
+                  const cfg = STUDENT_STATUS[effectiveStatus]
                   return (
                     <div key={c.id}
                       onClick={() => { setSelectedCheckin(c); setCheckinType('student') }}
@@ -289,6 +290,9 @@ export default function Checkins() {
                       </div>
                       <p className="text-xs opacity-80">{MEETING_LABELS[c.supervisor_meetings] || ''}</p>
                       <p className="text-xs opacity-80">{WRITING_LABELS[c.writing_status] || ''}</p>
+                      {c.override_status && c.override_status !== c.overall_status && (
+                        <p className="text-xs opacity-50 mt-1 line-through">{STUDENT_STATUS[c.overall_status]?.label} (original)</p>
+                      )}
                       {c.challenges && <p className="text-xs opacity-70 mt-1 line-clamp-1">⚠ {c.challenges}</p>}
                       {c.support_needed && <p className="text-xs opacity-70 mt-0.5 line-clamp-1">→ {c.support_needed}</p>}
                       <div className="flex items-center justify-between mt-1.5">

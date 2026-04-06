@@ -51,7 +51,8 @@ export default function CheckinDetailModal({ checkin, type, onClose }) {
   const [draftBody, setDraftBody]     = useState('')
   const [sending, setSending]         = useState(false)
   const [sent, setSent]               = useState(false)
-  const [coordStatus, setCoordStatus] = useState(checkin.coordinator_status || 'new')
+  const [coordStatus,    setCoordStatus]    = useState(checkin.coordinator_status || 'new')
+  const [overrideStatus, setOverrideStatus] = useState(checkin.override_status || '')
   const [resNote,     setResNote]     = useState(checkin.resolution_note || '')
   const [savingStatus, setSavingStatus] = useState(false)
   const [statusSaved,  setStatusSaved]  = useState(false)
@@ -81,6 +82,7 @@ export default function CheckinDetailModal({ checkin, type, onClose }) {
         coordinator_status: newStatus,
         resolution_note:    resNote || null,
         resolved_at:        newStatus === 'resolved' ? new Date().toISOString() : null,
+        override_status:    overrideStatus || null,
       }).eq('id', checkin.id)
       setCoordStatus(newStatus)
       setStatusSaved(true)
