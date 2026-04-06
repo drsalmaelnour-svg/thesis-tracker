@@ -169,7 +169,6 @@ function buildMilestoneStatus(students, milestoneId, milestoneGroupsData) {
       'Email':       s.email,
       'Cohort':      s.enrollment_year || '',
       'Supervisor':  s.supervisors?.name || '',
-      'Status':      status.charAt(0).toUpperCase()+status.slice(1),
     }
     // Group info from coordinator settings
     if (needsGroup && sm?.group_name) {
@@ -181,6 +180,42 @@ function buildMilestoneStatus(students, milestoneId, milestoneGroupsData) {
     }
     // Actual submitted response data
     Object.assign(row, extractResponses(sm, milestoneId))
+    return row
+  })
+}
+
+function buildMultiMilestone(students, milestoneIds, milGroupsData) {
+  // Build one row per student with columns for each selected milestone
+  const MILESTONE_COLUMNS = {
+    orcid:            ['orcid_id'],
+    irb_approval:     ['proposal_title','irb_number','approval_date'],
+    proposal_defense: ['committee_notes'],
+    progress_1:       ['submission_date','progress_summary'],
+    progress_2:       ['submission_date','progress_summary','proposed_completion'],
+    defense_schedule: ['defense_date','defense_time'],
+    thesis_submission:['final_title','submission_date','submission_notes'],
+  }
+
+  return students.map(s => {
+    const row = {
+      'Reg No':       s.student_id || '',
+      'Student Name': s.name,
+      'Supervisor':   s.supervisors?.name || '',
+    }
+    for (const mId of milestoneIds) {
+      const m      = MILESTONES.find(x => x.id === mId)
+      const sm     = (s.student_milestones||[]).find(x => x.milestone_id === mId)
+      const status = sm?.status || 'pending'
+      const prefix = m?.name || mId
+
+      // Extract actual response fields only — no status
+      let rd = sm?.response_data || {}
+      if (typeof rd === 'string') { try { rd = JSON.parse(rd) } catch { rd = {} } }
+      const expectedKeys = MILESTONE_COLUMNS[mId] || []
+      for (const k of expectedKeys) {
+        row[`${prefix} — ${fLabel(k)}`] = rd[k] || ''
+      }
+    }
     return row
   })
 }
@@ -441,7 +476,7 @@ export default function Reports() {
   // Filters & selectors
   const [reportType,       setReportType]       = useState('full_progress')
   const [cohortFilter,     setCohortFilter]     = useState('all')
-  const [milFilter,        setMilFilter]        = useState('orcid')
+  const [milFilter,        setMilFilter]        = useState(['orcid'])  // now an array
   const [groupMil,         setGroupMil]         = useState('proposal_defense')
   const [selStudent,       setSelStudent]       = useState('')
 
@@ -498,7 +533,9 @@ export default function Reports() {
     switch(reportType) {
       case 'full_progress':       return buildFullProgress(filteredStudents)
       case 'overdue':             return buildOverdue(filteredStudents)
-      case 'milestone_status':    return buildMilestoneStatus(filteredStudents, milFilter, milGroupsData)
+      case 'milestone_status':    return milFilter.length === 1
+        ? buildMilestoneStatus(filteredStudents, milFilter[0], milGroupsData)
+        : buildMultiMilestone(filteredStudents, milFilter, milGroupsData)
       case 'groups':              return buildGroups(filteredStudents, groupMil, milGroupsData)
       case 'individual': {
         const s = students.find(x=>x.id===selStudent)
@@ -522,7 +559,9 @@ export default function Reports() {
       case 'full_progress':       return 'Full Student Progress Report'
       case 'overdue':             return 'Overdue Students Report'
       case 'groups':              return `Group Assignments — ${GROUP_MILESTONES.find(m=>m.id===groupMil)?.name}`
-      case 'milestone_status':    return `${MILESTONES.find(m=>m.id===milFilter)?.name} — Student Responses`
+      case 'milestone_status':    return milFilter.length===1
+        ? `${MILESTONES.find(m=>m.id===milFilter[0])?.name} — Student Responses`
+        : `Combined Milestone Report — ${milFilter.map(id=>MILESTONES.find(m=>m.id===id)?.name||id).join(', ')}`
       case 'individual':          return `Individual Report — ${students.find(s=>s.id===selStudent)?.name||''}`
       case 'supervisor_checkins': return 'Supervisor Check-in Report'
       case 'issues_only':         return 'Student Issues & Recommended Actions'
@@ -653,13 +692,35 @@ export default function Reports() {
           {/* Contextual selectors */}
           {reportType==='milestone_status' && (
             <div className="card p-5">
-              <h3 className="font-semibold text-slate-100 text-sm mb-3">Select Milestone</h3>
-              <div className="relative">
-                <select className="input text-sm appearance-none pr-7" value={milFilter} onChange={e=>setMilFilter(e.target.value)}>
-                  {MILESTONES.map(m=><option key={m.id} value={m.id}>{m.icon} {m.name}</option>)}
-                </select>
-                <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-400 pointer-events-none"/>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-slate-100 text-sm">Select Milestones</h3>
+                <button onClick={() => setMilFilter(MILESTONES.map(m=>m.id))}
+                  className="text-xs text-gold-400 hover:text-gold-300 transition-colors">
+                  Select all
+                </button>
               </div>
+              <div className="space-y-2">
+                {MILESTONES.map(m => (
+                  <label key={m.id} className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border cursor-pointer transition-all ${
+                    milFilter.includes(m.id)
+                      ? 'border-gold-500/40 bg-gold-500/10'
+                      : 'border-navy-700/40 hover:border-navy-600/50'
+                  }`}>
+                    <input type="checkbox" className="accent-amber-400"
+                      checked={milFilter.includes(m.id)}
+                      onChange={e => setMilFilter(prev =>
+                        e.target.checked ? [...prev, m.id] : prev.filter(x => x !== m.id)
+                      )}/>
+                    <span className="text-sm">{m.icon}</span>
+                    <span className={`text-xs font-medium ${milFilter.includes(m.id)?'text-gold-300':'text-navy-400'}`}>
+                      {m.name}
+                    </span>
+                  </label>
+                ))}
+              </div>
+              {milFilter.length > 1 && (
+                <p className="text-xs text-gold-400/70 mt-2">{milFilter.length} milestones — combined report</p>
+              )}
             </div>
           )}
           {reportType==='groups' && (
