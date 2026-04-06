@@ -13,6 +13,7 @@ import {
   getCohortDeadlines
 } from '../lib/supabase'
 import EmailModal from '../components/EmailModal'
+import MilestoneDataModal from '../components/MilestoneDataModal'
 import AddStudentModal from '../components/AddStudentModal'
 import { sendReminder } from '../lib/emailService'
 import { formatDistanceToNow } from 'date-fns'
@@ -34,6 +35,7 @@ export default function StudentDetail() {
   const [activeTab, setActiveTab]   = useState('Milestones')
   const [showEmail, setShowEmail]   = useState(false)
   const [showEdit, setShowEdit]     = useState(false)
+  const [editMilestone, setEditMilestone] = useState(null) // { milestone, studentMilestone }
   const [reminderStatus, setReminderStatus] = useState({})
 
   // Notes
@@ -259,6 +261,12 @@ export default function StudentDetail() {
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => setEditMilestone({ milestone: m, studentMilestone: sm })}
+                    title="View / edit submitted data"
+                    className="btn-ghost p-1.5 rounded-lg">
+                    <Edit2 size={13}/>
+                  </button>
                   {status !== 'completed' && (
                     <button onClick={()=>handleSendReminder(m.id)} disabled={rStatus==='sending'}
                       title="Send reminder"
@@ -419,6 +427,15 @@ export default function StudentDetail() {
 
       {showEmail && <EmailModal student={student} onClose={()=>setShowEmail(false)}/>}
       {showEdit  && <AddStudentModal student={student} onClose={()=>setShowEdit(false)} onSuccess={load}/>}
+      {editMilestone && (
+        <MilestoneDataModal
+          student={student}
+          milestone={editMilestone.milestone}
+          studentMilestone={editMilestone.studentMilestone}
+          onSave={load}
+          onClose={()=>setEditMilestone(null)}
+        />
+      )}
     </div>
   )
 }
