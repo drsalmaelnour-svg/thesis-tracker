@@ -752,19 +752,71 @@ export default function Reports() {
     try {
       const rows    = getRows()
       const title   = getTitle()
+      const subtitle= getSubtitle()
       const headers = rows.length ? Object.keys(rows[0]) : []
-      const preview = rows.slice(0,15).map(r =>
-        headers.map(h=>`${h}: ${r[h]||'—'}`).join('  |  ')
-      ).join('\n')
-      const more = rows.length>15 ? `\n\n(${rows.length-15} more records — please export to PDF or Excel for full report)` : ''
+
+      // Build HTML table for email
+      const tableRows = rows.slice(0, 50)
+      const more = rows.length > 50 ? rows.length - 50 : 0
+
+      const headerCells = headers.map(h =>
+        `<th style="background:#1e3a5f;color:#fff;padding:8px 10px;text-align:left;font-size:11px;font-weight:600;border:1px solid #254474;white-space:nowrap">${h}</th>`
+      ).join('')
+
+      const bodyRows = tableRows.map((row, i) =>
+        `<tr style="background:${i%2===0?'#ffffff':'#f1f5f9'}">${
+          headers.map(h =>
+            `<td style="padding:7px 10px;font-size:11px;color:#1e293b;border:1px solid #e2e8f0">${row[h]||'—'}</td>`
+          ).join('')
+        }</tr>`
+      ).join('')
+
+      const message = `
+<div style="font-family:Arial,sans-serif;max-width:900px;margin:0 auto">
+
+  <!-- Header -->
+  <div style="background:#1e3a5f;padding:20px 24px;border-radius:8px 8px 0 0">
+    <p style="margin:0 0 4px;font-size:11px;color:#d4a843;font-weight:700;text-transform:uppercase;letter-spacing:1px">Gulf Medical University — MSc Medical Laboratory Sciences</p>
+    <p style="margin:0;font-size:18px;color:#ffffff;font-weight:700">${title}</p>
+    ${subtitle ? `<p style="margin:4px 0 0;font-size:11px;color:#94a3b8">${subtitle}</p>` : ''}
+  </div>
+
+  <!-- Meta bar -->
+  <div style="background:#f8fafc;padding:10px 24px;border:1px solid #e2e8f0;display:flex;justify-content:space-between">
+    <span style="font-size:11px;color:#64748b">Generated: ${fmtDate(new Date())} &nbsp;|&nbsp; ${rows.length} records</span>
+    <span style="font-size:11px;color:#64748b;font-weight:600">CONFIDENTIAL</span>
+  </div>
+
+  <!-- Table -->
+  <div style="overflow-x:auto;border:1px solid #e2e8f0;border-top:none">
+    <table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif">
+      <thead><tr>${headerCells}</tr></thead>
+      <tbody>${bodyRows}</tbody>
+    </table>
+  </div>
+
+  ${more ? `<p style="font-size:11px;color:#64748b;padding:8px 0;text-align:center">... and ${more} more records. Download the PDF for the complete report.</p>` : ''}
+
+  <!-- Gold accent line -->
+  <div style="height:3px;background:linear-gradient(90deg,#d4a843,#f0c060);margin-top:16px"></div>
+
+  <!-- Signature -->
+  <div style="padding:16px 0 0">
+    <div style="width:120px;height:1px;background:#d4a843;margin-bottom:8px"></div>
+    <p style="margin:0;font-size:13px;font-weight:700;color:#1e3a5f">${SIGNATURE.name}</p>
+    <p style="margin:2px 0 0;font-size:11px;color:#64748b">${SIGNATURE.title}</p>
+    <p style="margin:2px 0 0;font-size:11px;color:#64748b">${INSTITUTION}</p>
+  </div>
+
+</div>`
 
       await sendStudentEmail({
-        student:     { name: 'Coordinator', email: emailTo, token: '' },
+        student:     { name: emailTo.split('@')[0], email: emailTo, token: '' },
         milestoneId: null,
         subject:     `${title} — ${fmtDate(new Date())}`,
-        message:     `Please find below the ${title}.\n\nGenerated: ${fmtDate(new Date())}\nTotal Records: ${rows.length}\n\n${preview}${more}\n\n${SIGNATURE.name}\n${SIGNATURE.title}\n${INSTITUTION}`,
+        message,
       })
-      setEmailResult({ ok: true, msg: `Report sent to ${emailTo}` })
+      setEmailResult({ ok: true, msg: `Report sent to ${emailTo}. For a signed PDF version use Download PDF and attach it manually.` })
     } catch(e) {
       setEmailResult({ ok: false, msg: 'Failed to send. Please try again.' })
     }
