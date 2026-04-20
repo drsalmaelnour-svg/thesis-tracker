@@ -17,6 +17,7 @@ export default function AddStudentModal({ onClose, onSuccess, student: existing 
     research_area:   existing?.research_area   || '',
   })
   const [saving, setSaving] = useState(false)
+  const [specOther, setSpecOther] = useState('')
   const [error, setError]   = useState('')
 
   const [allSpecs, setAllSpecs] = useState([])
@@ -175,15 +176,28 @@ export default function AddStudentModal({ onClose, onSuccess, student: existing 
 
           <div>
             <label className="block text-xs text-navy-400 mb-1">Research Area</label>
-            <select className="input" value={form.research_area}
-              onChange={e => set('research_area', e.target.value)}>
+            <select className="input" value={
+              ['Clinical Chemistry','Molecular Biology','Microbiology','Haematology','Immunology'].includes(form.research_area)
+                ? form.research_area : form.research_area ? 'Other' : ''
+            } onChange={e => {
+              if (e.target.value === 'Other') { set('research_area', ''); setSpecOther('') }
+              else { set('research_area', e.target.value); setSpecOther('') }
+            }}>
               <option value="">— Select research area —</option>
-              {allSpecs.map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
+              <option value="Clinical Chemistry">Clinical Chemistry</option>
+              <option value="Molecular Biology">Molecular Biology</option>
+              <option value="Microbiology">Microbiology</option>
+              <option value="Haematology">Haematology</option>
+              <option value="Immunology">Immunology</option>
+              <option value="Other">Other…</option>
             </select>
-            {allSpecs.length === 0 && (
-              <p className="text-xs text-navy-600 mt-1">Add specializations to examiners first to populate this list.</p>
+            {(form.research_area === '' && specOther !== undefined) && ['Clinical Chemistry','Molecular Biology','Microbiology','Haematology','Immunology'].includes(form.research_area) === false && (
+              null
+            )}
+            {(!['Clinical Chemistry','Molecular Biology','Microbiology','Haematology','Immunology',''].includes(form.research_area) || specOther) && (
+              <input className="input mt-1.5" placeholder="Enter research area"
+                value={specOther || (form.research_area && !['Clinical Chemistry','Molecular Biology','Microbiology','Haematology','Immunology'].includes(form.research_area) ? form.research_area : '')}
+                onChange={e => { setSpecOther(e.target.value); set('research_area', e.target.value) }}/>
             )}
           </div>
 

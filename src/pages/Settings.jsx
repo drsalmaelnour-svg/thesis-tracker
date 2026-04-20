@@ -175,7 +175,7 @@ function GroupManagement() {
 
 export default function Settings() {
   const [supervisors, setSupervisors] = useState([])
-  const [newSup, setNewSup] = useState({ name: '', email: '', department: '' })
+  const [newSup, setNewSup] = useState({ name: '', email: '', specialization: '', specOther: '' })
   const [addingSuper, setAddingSuper] = useState(false)
   const [saved, setSaved] = useState('')
   const [dbStatus, setDbStatus] = useState('checking')
@@ -192,9 +192,10 @@ export default function Settings() {
   async function addSupervisor() {
     if (!newSup.name.trim() || !newSup.email.trim()) return
     setAddingSuper(true)
-    const { error } = await supabase.from('supervisors').insert(newSup)
+    const resolved = { name: newSup.name, email: newSup.email, specialization: newSup.specialization === 'Other' ? newSup.specOther : newSup.specialization }
+    const { error } = await supabase.from('supervisors').insert(resolved)
     if (!error) {
-      setNewSup({ name: '', email: '', department: '' })
+      setNewSup({ name: '', email: '', specialization: '', specOther: '' })
       getSupervisors().then(setSupervisors)
       setSaved('supervisor')
       setTimeout(() => setSaved(''), 3000)
@@ -302,8 +303,19 @@ export default function Settings() {
             <input className="input" type="email" placeholder="j.smith@univ.edu" value={newSup.email} onChange={e => setNewSup(p => ({...p, email: e.target.value}))} />
           </div>
           <div>
-            <label className="block text-xs text-navy-400 mb-1">Department</label>
-            <input className="input" placeholder="e.g. Computer Science" value={newSup.department} onChange={e => setNewSup(p => ({...p, department: e.target.value}))} />
+            <label className="block text-xs text-navy-400 mb-1">Specialization</label>
+            <select className="input" value={newSup.specialization} onChange={e => setNewSup(p => ({...p, specialization: e.target.value, specOther: ''}))}>
+              <option value="">— Select —</option>
+              <option value="Clinical Chemistry">Clinical Chemistry</option>
+              <option value="Molecular Biology">Molecular Biology</option>
+              <option value="Microbiology">Microbiology</option>
+              <option value="Haematology">Haematology</option>
+              <option value="Immunology">Immunology</option>
+              <option value="Other">Other…</option>
+            </select>
+            {newSup.specialization === 'Other' && (
+              <input className="input mt-1.5" placeholder="Enter specialization" value={newSup.specOther} onChange={e => setNewSup(p => ({...p, specOther: e.target.value}))} />
+            )}
           </div>
         </div>
         <button
@@ -323,7 +335,7 @@ export default function Settings() {
                 <div>
                   <p className="text-sm font-medium text-slate-200">{s.name}</p>
                   <p className="text-xs text-navy-400">{s.email}</p>
-                  {s.department && <p className="text-xs text-navy-500">{s.department}</p>}
+                  {s.specialization && <span className="inline-block mt-1 text-xs text-gold-300/80 bg-gold-500/10 border border-gold-500/20 px-2 py-0.5 rounded-lg">{s.specialization}</span>}
                 </div>
                 <button
                   onClick={() => deleteSupervisor(s.id)}

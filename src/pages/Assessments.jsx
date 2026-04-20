@@ -834,26 +834,50 @@ function ExaminerSelector({ label, value, onChange, type, onTypeChange, needsExt
 }
 
 function ExaminerForm({ initial, onSave, onCancel }) {
-  const [form, setForm] = useState(initial)
-  const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState('')
+  const [form,     setForm]     = useState(initial)
+  const [specOther,setSpecOther]= useState(initial.specialization && !['Clinical Chemistry','Molecular Biology','Microbiology','Haematology','Immunology'].includes(initial.specialization) ? initial.specialization : '')
+  const [saving,   setSaving]   = useState(false)
+  const [err,      setErr]      = useState('')
+
+  const isOther = form.specialization === 'Other' || (form.specialization && !['Clinical Chemistry','Molecular Biology','Microbiology','Haematology','Immunology',''].includes(form.specialization) && !['Other'].includes(form.specialization))
+
   async function save() {
     if (!form.name.trim()||!form.email.trim()) { setErr('Name and email required.'); return }
-    setSaving(true); try { await onSave(form) } catch(e) { setErr(e.message) } setSaving(false)
+    const resolved = { ...form, specialization: form.specialization === 'Other' ? specOther : form.specialization }
+    setSaving(true); try { await onSave(resolved) } catch(e) { setErr(e.message) } setSaving(false)
   }
+
   return (
     <div className="card p-5 border-gold-500/30">
       <h3 className="font-semibold text-slate-100 text-sm mb-4">{initial.id?'Edit':'Add'} External Examiner</h3>
       <div className="grid grid-cols-2 gap-3">
         {[['name','Full Name *','Dr. John Smith'],['email','Email *','j.smith@uni.ac.ae'],
           ['designation','Designation','Associate Professor'],['institution','Institution','University of Sharjah'],
-          ['specialization','Specialization (optional)','Clinical Biochemistry']
         ].map(([k,l,p])=>(
-          <div key={k} className={k==='specialization'?'col-span-2':''}>
+          <div key={k}>
             <label className="block text-xs text-navy-400 mb-1">{l}</label>
             <input className="input text-sm" placeholder={p} value={form[k]||''} onChange={e=>setForm(v=>({...v,[k]:e.target.value}))}/>
           </div>
         ))}
+        <div className="col-span-2">
+          <label className="block text-xs text-navy-400 mb-1">Specialization</label>
+          <select className="input text-sm"
+            value={['Clinical Chemistry','Molecular Biology','Microbiology','Haematology','Immunology'].includes(form.specialization) ? form.specialization : form.specialization ? 'Other' : ''}
+            onChange={e => { setForm(v=>({...v, specialization: e.target.value})); if(e.target.value !== 'Other') setSpecOther('') }}>
+            <option value="">— Select —</option>
+            <option value="Clinical Chemistry">Clinical Chemistry</option>
+            <option value="Molecular Biology">Molecular Biology</option>
+            <option value="Microbiology">Microbiology</option>
+            <option value="Haematology">Haematology</option>
+            <option value="Immunology">Immunology</option>
+            <option value="Other">Other…</option>
+          </select>
+          {(form.specialization === 'Other' || (form.specialization && !['Clinical Chemistry','Molecular Biology','Microbiology','Haematology','Immunology','Other',''].includes(form.specialization))) && (
+            <input className="input text-sm mt-1.5" placeholder="Enter specialization"
+              value={specOther || (form.specialization !== 'Other' ? form.specialization : '')}
+              onChange={e => { setSpecOther(e.target.value); setForm(v=>({...v,specialization:'Other'})) }}/>
+          )}
+        </div>
       </div>
       {err && <p className="text-xs text-red-400 mt-2">{err}</p>}
       <div className="flex gap-2 mt-4">
