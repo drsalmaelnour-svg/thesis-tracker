@@ -870,6 +870,7 @@ function ExaminerForm({ initial, onSave, onCancel }) {
             <option value="Assistant Professor">Assistant Professor</option>
             <option value="Associate Professor">Associate Professor</option>
             <option value="Professor">Professor</option>
+            <option value="Researcher">Researcher</option>
           </select>
         </div>
         <div className="col-span-2">
