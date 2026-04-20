@@ -175,7 +175,7 @@ function GroupManagement() {
 
 export default function Settings() {
   const [supervisors, setSupervisors] = useState([])
-  const [newSup, setNewSup] = useState({ name: '', email: '', specialization: '', specOther: '' })
+  const [newSup, setNewSup] = useState({ name: '', email: '', designation: '', institution: '', specialization: '', specOther: '' })
   const [addingSuper, setAddingSuper] = useState(false)
   const [saved, setSaved] = useState('')
   const [dbStatus, setDbStatus] = useState('checking')
@@ -192,10 +192,10 @@ export default function Settings() {
   async function addSupervisor() {
     if (!newSup.name.trim() || !newSup.email.trim()) return
     setAddingSuper(true)
-    const resolved = { name: newSup.name, email: newSup.email, specialization: newSup.specialization === 'Other' ? newSup.specOther : newSup.specialization }
+    const resolved = { name: newSup.name, email: newSup.email, designation: newSup.designation || null, institution: newSup.institution || null, specialization: newSup.specialization === 'Other' ? newSup.specOther : newSup.specialization }
     const { error } = await supabase.from('supervisors').insert(resolved)
     if (!error) {
-      setNewSup({ name: '', email: '', specialization: '', specOther: '' })
+      setNewSup({ name: '', email: '', designation: '', institution: '', specialization: '', specOther: '' })
       getSupervisors().then(setSupervisors)
       setSaved('supervisor')
       setTimeout(() => setSaved(''), 3000)
@@ -293,7 +293,7 @@ export default function Settings() {
         )}
 
         {/* Add supervisor */}
-        <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="grid grid-cols-2 gap-3 mb-3">
           <div>
             <label className="block text-xs text-navy-400 mb-1">Name *</label>
             <input className="input" placeholder="Dr. Jane Smith" value={newSup.name} onChange={e => setNewSup(p => ({...p, name: e.target.value}))} />
@@ -303,6 +303,23 @@ export default function Settings() {
             <input className="input" type="email" placeholder="j.smith@univ.edu" value={newSup.email} onChange={e => setNewSup(p => ({...p, email: e.target.value}))} />
           </div>
           <div>
+            <label className="block text-xs text-navy-400 mb-1">Designation</label>
+            <select className="input" value={newSup.designation} onChange={e => setNewSup(p => ({...p, designation: e.target.value}))}>
+              <option value="">— Select —</option>
+              <option value="Assistant Professor">Assistant Professor</option>
+              <option value="Associate Professor">Associate Professor</option>
+              <option value="Professor">Professor</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-navy-400 mb-1">Institution</label>
+            <select className="input" value={newSup.institution} onChange={e => setNewSup(p => ({...p, institution: e.target.value}))}>
+              <option value="">— Select —</option>
+              <option value="GMU Medical Laboratory Sciences">GMU Medical Laboratory Sciences</option>
+              <option value="TRIPM">TRIPM</option>
+            </select>
+          </div>
+          <div className="col-span-2">
             <label className="block text-xs text-navy-400 mb-1">Specialization</label>
             <select className="input" value={newSup.specialization} onChange={e => setNewSup(p => ({...p, specialization: e.target.value, specOther: ''}))}>
               <option value="">— Select —</option>
@@ -335,7 +352,11 @@ export default function Settings() {
                 <div>
                   <p className="text-sm font-medium text-slate-200">{s.name}</p>
                   <p className="text-xs text-navy-400">{s.email}</p>
-                  {s.specialization && <span className="inline-block mt-1 text-xs text-gold-300/80 bg-gold-500/10 border border-gold-500/20 px-2 py-0.5 rounded-lg">{s.specialization}</span>}
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {s.designation && <span className="text-xs text-navy-300 bg-navy-700/40 border border-navy-600/40 px-2 py-0.5 rounded-lg">{s.designation}</span>}
+                    {s.institution && <span className="text-xs text-navy-300 bg-navy-700/40 border border-navy-600/40 px-2 py-0.5 rounded-lg">{s.institution}</span>}
+                    {s.specialization && <span className="text-xs text-gold-300/80 bg-gold-500/10 border border-gold-500/20 px-2 py-0.5 rounded-lg">{s.specialization}</span>}
+                  </div>
                 </div>
                 <button
                   onClick={() => deleteSupervisor(s.id)}

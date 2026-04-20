@@ -736,6 +736,10 @@ function ExaminersTab({ externals, supervisors, onRefresh }) {
             <div>
               <p className="text-sm font-medium text-slate-300">{sup.name}</p>
               <p className="text-xs text-navy-500">{sup.email}</p>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {sup.designation && <span className="text-xs text-navy-300 bg-navy-700/40 border border-navy-600/40 px-1.5 py-0.5 rounded-md">{sup.designation}</span>}
+                {sup.institution && <span className="text-xs text-navy-300 bg-navy-700/40 border border-navy-600/40 px-1.5 py-0.5 rounded-md">{sup.institution}</span>}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -852,13 +856,22 @@ function ExaminerForm({ initial, onSave, onCancel }) {
       <h3 className="font-semibold text-slate-100 text-sm mb-4">{initial.id?'Edit':'Add'} External Examiner</h3>
       <div className="grid grid-cols-2 gap-3">
         {[['name','Full Name *','Dr. John Smith'],['email','Email *','j.smith@uni.ac.ae'],
-          ['designation','Designation','Associate Professor'],['institution','Institution','University of Sharjah'],
+          ['institution','Institution','University of Sharjah'],
         ].map(([k,l,p])=>(
           <div key={k}>
             <label className="block text-xs text-navy-400 mb-1">{l}</label>
             <input className="input text-sm" placeholder={p} value={form[k]||''} onChange={e=>setForm(v=>({...v,[k]:e.target.value}))}/>
           </div>
         ))}
+        <div>
+          <label className="block text-xs text-navy-400 mb-1">Designation</label>
+          <select className="input text-sm" value={form.designation||''} onChange={e=>setForm(v=>({...v,designation:e.target.value}))}>
+            <option value="">— Select —</option>
+            <option value="Assistant Professor">Assistant Professor</option>
+            <option value="Associate Professor">Associate Professor</option>
+            <option value="Professor">Professor</option>
+          </select>
+        </div>
         <div className="col-span-2">
           <label className="block text-xs text-navy-400 mb-1">Specialization</label>
           <select className="input text-sm"
