@@ -1266,6 +1266,7 @@ Gulf Medical University`)
                 <th className="text-left px-4 py-3 text-navy-300 font-semibold">Examiner 2</th>
                 <th className="text-left px-4 py-3 text-navy-300 font-semibold">Status</th>
                 <th className="text-left px-4 py-3 text-navy-300 font-semibold">Send Link</th>
+                <th className="text-left px-4 py-3 text-navy-300 font-semibold">Delete</th>
               </tr>
             </thead>
             <tbody>
@@ -1305,6 +1306,24 @@ Gulf Medical University`)
                           )
                         })}
                       </div>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {asgn.length > 0 && (
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`Delete all examiner assignments for ${s.name} — ${ASSESSMENT_TYPES.find(t=>t.id===assessmentType)?.label}?`)) return
+                            const { supabase } = await import('../lib/supabase')
+                            await supabase.from('assessment_assignments')
+                              .delete()
+                              .eq('student_id', s.id)
+                              .in('assessment_type', isCombined ? ['defense_before','defense_after'] : [assessmentType])
+                            onRefresh()
+                          }}
+                          className="btn-ghost p-1.5 rounded-lg text-red-400/50 hover:text-red-400 transition-colors"
+                          title="Delete assignment">
+                          <Trash2 size={13}/>
+                        </button>
+                      )}
                     </td>
                   </tr>
                 )
