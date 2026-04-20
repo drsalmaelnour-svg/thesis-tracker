@@ -4,7 +4,7 @@ import {
   AlertCircle, RefreshCw, Send, X, UserPlus, Upload,
   Building2, Mail, BookOpen, Edit2, Save, Trash2,
   Search, Filter, ClipboardList, TrendingUp, Info,
-  Lock, Unlock, Download, FileText, Eye, FileSpreadsheet
+  Lock, Unlock, Download, FileText, Eye, FileSpreadsheet, Sparkles, Tag
 } from 'lucide-react'
 import {
   getStudentsWithProgress, getExternalExaminers,
@@ -455,7 +455,7 @@ export default function Assessments() {
 
       {/* Tab content */}
       {activeTab==='overview'  && <OverviewTab  students={filtered} assignments={assignments} assignStatus={assignStatus} cohort={cohort}/>}
-      {activeTab==='examiners' && <ExaminersTab externals={externals} onRefresh={load}/>}
+      {activeTab==='examiners' && <ExaminersTab externals={externals} supervisors={supervisors} onRefresh={load}/>}
       {activeTab==='assign'    && <AssignTab    students={filtered} supervisors={supervisors} externals={externals} assignments={assignments} onRefresh={load} getExaminerName={getExaminerName} getExaminerEmail={getExaminerEmail}/>}
       {activeTab==='results'   && <ResultsTab   students={filtered} assignments={assignments} supervisors={supervisors} externals={externals} getExaminerName={getExaminerName}/>}
     </div>
@@ -562,13 +562,28 @@ function OverviewTab({ students, assignments, assignStatus, cohort }) {
 // ══════════════════════════════════════════════════════════════
 // EXAMINERS TAB
 // ══════════════════════════════════════════════════════════════
-function ExaminersTab({ externals, onRefresh }) {
+function ExaminersTab({ externals, supervisors, onRefresh }) {
   const [search,     setSearch]     = useState('')
+  const [specFilter, setSpecFilter] = useState('all')
+  const [showTab,    setShowTab]    = useState('external') // 'external' | 'internal'
   const [showForm,   setShowForm]   = useState(false)
   const [editItem,   setEditItem]   = useState(null)
   const [importing,  setImporting]  = useState(false)
   const [importMsg,  setImportMsg]  = useState(null)
+  const [editingSup, setEditingSup] = useState(null)
+  const [supSpecVal, setSupSpecVal] = useState('')
+  const [savingSup,  setSavingSup]  = useState(false)
   const fileRef = useRef()
+
+  async function saveSupSpec(supId) {
+    setSavingSup(supId)
+    try {
+      const { supabase } = await import('../lib/supabase')
+      await supabase.from('supervisors').update({ specialization: supSpecVal }).eq('id', supId)
+      setEditingSup(null); onRefresh()
+    } catch(e) { console.error(e) }
+    setSavingSup(null)
+  }
 
   async function handleSave(form) {
     await upsertExternalExaminer(form)
@@ -598,29 +613,70 @@ function ExaminersTab({ externals, onRefresh }) {
     a.download='external_examiners_template.csv'; a.click()
   }
 
-  const shown = externals.filter(e=>
-    e.name.toLowerCase().includes(search.toLowerCase()) ||
-    e.email.toLowerCase().includes(search.toLowerCase()) ||
-    (e.institution||'').toLowerCase().includes(search.toLowerCase())
-  )
+  // All specializations across both pools
+  const allSpecs = [...new Set([
+    ...externals.map(e=>e.specialization).filter(Boolean),
+    ...supervisors.map(s=>s.specialization).filter(Boolean),
+  ])].sort()
+
+  const shown = (showTab === 'external' ? externals : supervisors).filter(e=> {
+    const matchSearch =
+      e.name.toLowerCase().includes(search.toLowerCase()) ||
+      (e.email||'').toLowerCase().includes(search.toLowerCase()) ||
+      (e.institution||'').toLowerCase().includes(search.toLowerCase()) ||
+      (e.specialization||'').toLowerCase().includes(search.toLowerCase())
+    const matchSpec = specFilter === 'all' || e.specialization === specFilter
+    return matchSearch && matchSpec
+  })
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="relative">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-navy-400"/>
-          <input className="input pl-8 text-sm py-2" placeholder="Search examiners…" value={search} onChange={e=>setSearch(e.target.value)}/>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={downloadTemplate} className="btn-secondary text-xs"><Upload size={13}/> Template</button>
-          <button onClick={()=>fileRef.current.click()} disabled={importing} className="btn-secondary text-xs disabled:opacity-50">
-            {importing?<Loader2 size={13} className="animate-spin"/>:<Upload size={13}/>} Import CSV
+      {/* Sub-tabs: External / Internal */}
+      <div className="flex gap-0 border-b border-navy-700/50">
+        {[{v:'external',label:'External Examiners',count:externals.length},{v:'internal',label:'Internal (Supervisors)',count:supervisors.length}].map(t=>(
+          <button key={t.v} onClick={()=>{setShowTab(t.v);setSearch('');setSpecFilter('all')}}
+            className={`px-4 py-2 text-xs font-medium border-b-2 transition-all flex items-center gap-1.5 ${
+              showTab===t.v?'border-gold-500 text-gold-300':'border-transparent text-navy-400 hover:text-slate-300'
+            }`}>
+            {t.label}
+            <span className={`px-1.5 py-0.5 rounded-full text-xs ${showTab===t.v?'bg-gold-500/20 text-gold-400':'bg-navy-700/60 text-navy-500'}`}>{t.count}</span>
           </button>
-          <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={e=>handleImport(e.target.files[0])}/>
-          <button onClick={()=>{setShowForm(true);setEditItem(null)}} className="btn-primary text-xs">
-            <UserPlus size={13}/> Add Examiner
-          </button>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 flex-1">
+          <div className="relative flex-1 max-w-xs">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-navy-400"/>
+            <input className="input pl-8 text-sm py-2 w-full" placeholder="Search examiners…" value={search} onChange={e=>setSearch(e.target.value)}/>
+          </div>
+          {/* Specialization filter */}
+          {allSpecs.length > 0 && (
+            <div className="relative">
+              <select className="input text-xs py-2 appearance-none pr-7"
+                value={specFilter} onChange={e=>setSpecFilter(e.target.value)}>
+                <option value="all">All specializations</option>
+                {allSpecs.map(s=><option key={s} value={s}>{s}</option>)}
+              </select>
+              <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-navy-400 pointer-events-none"/>
+            </div>
+          )}
         </div>
+        {showTab === 'external' && (
+          <div className="flex gap-2">
+            <button onClick={downloadTemplate} className="btn-secondary text-xs"><Upload size={13}/> Template</button>
+            <button onClick={()=>fileRef.current.click()} disabled={importing} className="btn-secondary text-xs disabled:opacity-50">
+              {importing?<Loader2 size={13} className="animate-spin"/>:<Upload size={13}/>} Import CSV
+            </button>
+            <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={e=>handleImport(e.target.files[0])}/>
+            <button onClick={()=>{setShowForm(true);setEditItem(null)}} className="btn-primary text-xs">
+              <UserPlus size={13}/> Add Examiner
+            </button>
+          </div>
+        )}
+        {showTab === 'internal' && (
+          <p className="text-xs text-navy-500">Click the ✏️ on any supervisor to add their specialization</p>
+        )}
       </div>
 
       {importMsg && (
@@ -637,7 +693,7 @@ function ExaminersTab({ externals, onRefresh }) {
         {shown.length===0 ? (
           <div className="col-span-3 card p-10 text-center text-navy-500">
             <Users size={28} className="mx-auto mb-2 opacity-30"/>
-            <p className="text-sm">{search?'No matches.':'No external examiners yet.'}</p>
+            <p className="text-sm">{search||specFilter!=='all'?'No matches.':showTab==='external'?'No external examiners yet.':'No supervisors found.'}</p>
           </div>
         ) : shown.map(e=>(
           <div key={e.id} className="card p-4 group">
@@ -659,10 +715,119 @@ function ExaminersTab({ externals, onRefresh }) {
             <div className="mt-2.5 space-y-1">
               <div className="flex items-center gap-1.5 text-xs text-navy-400"><Building2 size={10}/>{e.institution||'—'}</div>
               <div className="flex items-center gap-1.5 text-xs text-navy-400"><Mail size={10}/>{e.email}</div>
-              {e.specialization && <div className="flex items-center gap-1.5 text-xs text-navy-400"><BookOpen size={10}/>{e.specialization}</div>}
+              {e.specialization && (
+                <div className="flex items-center gap-1.5 text-xs">
+                  <Tag size={10} className="text-gold-400/70 shrink-0"/>
+                  <span className="text-gold-300/80 font-medium">{e.specialization}</span>
+                </div>
+              )}
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Internal supervisor specialization edit panel */}
+      {showTab === 'internal' && shown.map((sup, i) => (
+        <div key={sup.id} className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all ${i%2===0?'bg-navy-800/10 border-navy-700/20':'border-transparent'}`}>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-navy-700 flex items-center justify-center text-xs font-bold text-gold-400 shrink-0">
+              {sup.name?.charAt(0)?.toUpperCase()}
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-300">{sup.name}</p>
+              <p className="text-xs text-navy-500">{sup.email}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {editingSup === sup.id ? (
+              <>
+                <input className="input text-xs py-1.5 w-48" placeholder="e.g. Clinical Microbiology"
+                  value={supSpecVal} onChange={e=>setSupSpecVal(e.target.value)}
+                  autoFocus onKeyDown={e=>e.key==='Enter'&&saveSupSpec(sup.id)}/>
+                <button onClick={()=>saveSupSpec(sup.id)} disabled={!!savingSup} className="btn-primary text-xs py-1.5 px-3 disabled:opacity-50">
+                  {savingSup===sup.id?<Loader2 size={11} className="animate-spin"/>:<Save size={11}/>}
+                </button>
+                <button onClick={()=>setEditingSup(null)} className="btn-secondary text-xs py-1.5 px-2"><X size={11}/></button>
+              </>
+            ) : (
+              <>
+                {sup.specialization
+                  ? <span className="flex items-center gap-1 text-xs text-gold-300/80 bg-gold-500/10 border border-gold-500/20 px-2.5 py-1 rounded-xl">
+                      <Tag size={10}/> {sup.specialization}
+                    </span>
+                  : <span className="text-xs text-navy-600 italic">No specialization set</span>
+                }
+                <button onClick={()=>{setEditingSup(sup.id);setSupSpecVal(sup.specialization||'')}}
+                  className="btn-ghost p-1.5 rounded-lg"><Edit2 size={12}/></button>
+              </>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ExaminerSelector({ label, value, onChange, type, onTypeChange, needsExternal, opts, allSpecs, specFilter, onSpecFilter, suggestions }) {
+  const suggested = suggestions.filter(s => s.id !== value)
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <label className="text-xs text-navy-400">{label}</label>
+        {needsExternal && (
+          <div className="flex gap-1">
+            {['internal','external'].map(t=>(
+              <button key={t} onClick={()=>onTypeChange(t)}
+                className={`px-2 py-0.5 rounded text-xs font-medium border transition-all ${type===t?'border-gold-500/40 bg-gold-500/10 text-gold-300':'border-navy-600/50 text-navy-400'}`}>{t}</button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Specialization filter */}
+      {allSpecs.length > 0 && (
+        <div className="relative">
+          <Tag size={10} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-navy-500 pointer-events-none"/>
+          <select className="input text-xs py-1.5 appearance-none pl-7 pr-6 text-navy-300"
+            value={specFilter} onChange={e=>onSpecFilter(e.target.value)}>
+            <option value="all">All specializations</option>
+            {allSpecs.map(s=><option key={s} value={s}>{s}</option>)}
+          </select>
+          <ChevronDown size={10} className="absolute right-2 top-1/2 -translate-y-1/2 text-navy-400 pointer-events-none"/>
+        </div>
+      )}
+
+      {/* Auto-suggestions */}
+      {suggested.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs text-gold-400/70 flex items-center gap-1">
+            <Sparkles size={10}/> Suggested match
+          </p>
+          {suggested.slice(0,2).map(s=>(
+            <button key={s.id} onClick={()=>onChange(s.id)}
+              className={`w-full text-left px-2.5 py-2 rounded-xl border text-xs transition-all ${
+                value===s.id
+                  ? 'border-gold-500/40 bg-gold-500/10'
+                  : 'border-gold-500/20 bg-gold-500/5 hover:border-gold-500/40'
+              }`}>
+              <span className="font-medium text-gold-300">{s.name}</span>
+              {s.specialization && <span className="text-navy-400 ml-1">· {s.specialization}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Main selector */}
+      <div className="relative">
+        <select className="input text-sm appearance-none pr-7" value={value} onChange={e=>onChange(e.target.value)}>
+          <option value="">— Select {type} examiner —</option>
+          {opts.map(e=>(
+            <option key={e.id} value={e.id}>
+              {e.name}{e.specialization ? ` · ${e.specialization}` : ''}
+            </option>
+          ))}
+        </select>
+        <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-400 pointer-events-none"/>
       </div>
     </div>
   )
@@ -721,8 +886,30 @@ function AssignTab({ students, supervisors, externals, assignments, onRefresh, g
   const [emailSending, setEmailSending] = useState(false)
   const [emailSent,    setEmailSent]    = useState(false)
 
+  const [specFilter1, setSpecFilter1] = useState('all')
+  const [specFilter2, setSpecFilter2] = useState('all')
   const needsExternal = NEEDS_EXTERNAL.includes(assessmentType)
   const isCombined    = assessmentType === 'defense_combined'
+
+  // All specializations
+  const allSpecs = [...new Set([
+    ...externals.map(e=>e.specialization).filter(Boolean),
+    ...supervisors.map(s=>s.specialization).filter(Boolean),
+  ])].sort()
+
+  // Auto-suggest: match examiner specialization to student's research area
+  function getSuggestions(studentId, type) {
+    const student = students.find(s=>s.id===studentId)
+    const rd = (student?.student_milestones||[])
+      .find(m=>m.milestone_id==='irb_approval')?.response_data || {}
+    const title = (typeof rd==='string' ? JSON.parse(rd||'{}') : rd)?.proposal_title || ''
+    const titleWords = title.toLowerCase().split(/\s+/)
+    const pool = type==='external' ? externals : supervisors.filter(s=>s.id!==student?.supervisor_id)
+    return pool.filter(e => {
+      const spec = (e.specialization||'').toLowerCase()
+      return spec && titleWords.some(w => w.length>4 && spec.includes(w))
+    })
+  }
 
   useEffect(() => { if (students.length) setSelStudent(students[0].id) }, [students])
 
@@ -740,8 +927,9 @@ function AssignTab({ students, supervisors, externals, assignments, onRefresh, g
     const s = students.find(x=>x.id===studentId)
     return supervisors.filter(sup=>sup.id!==s?.supervisor_id)
   }
-  function examOpts(studentId, type) {
-    return type==='external' ? externals : internalOpts(studentId)
+  function examOpts(studentId, type, specFilter='all') {
+    const base = type==='external' ? externals : internalOpts(studentId)
+    return specFilter==='all' ? base : base.filter(e=>e.specialization===specFilter)
   }
 
   async function handleSave() {
@@ -943,47 +1131,23 @@ Gulf Medical University`)
             </div>
           )}
           {/* Examiner 1 */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs text-navy-400">Examiner 1</label>
-              {needsExternal && (
-                <div className="flex gap-1">
-                  {['internal','external'].map(t=>(
-                    <button key={t} onClick={()=>{setEx1Type(t);setEx1('')}}
-                      className={`px-2 py-0.5 rounded text-xs font-medium border transition-all ${ex1Type===t?'border-gold-500/40 bg-gold-500/10 text-gold-300':'border-navy-600/50 text-navy-400'}`}>{t}</button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="relative">
-              <select className="input text-sm appearance-none pr-7" value={ex1} onChange={e=>setEx1(e.target.value)}>
-                <option value="">— Select —</option>
-                {examOpts(selStudent,ex1Type).map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
-              </select>
-              <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-400 pointer-events-none"/>
-            </div>
-          </div>
+          <ExaminerSelector
+            label="Examiner 1" value={ex1} onChange={setEx1}
+            type={ex1Type} onTypeChange={t=>{setEx1Type(t);setEx1('');setSpecFilter1('all')}}
+            needsExternal={needsExternal}
+            opts={examOpts(selStudent,ex1Type,specFilter1)}
+            allSpecs={allSpecs} specFilter={specFilter1} onSpecFilter={setSpecFilter1}
+            suggestions={getSuggestions(selStudent,ex1Type)}
+          />
           {/* Examiner 2 */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs text-navy-400">Examiner 2</label>
-              {needsExternal && (
-                <div className="flex gap-1">
-                  {['internal','external'].map(t=>(
-                    <button key={t} onClick={()=>{setEx2Type(t);setEx2('')}}
-                      className={`px-2 py-0.5 rounded text-xs font-medium border transition-all ${ex2Type===t?'border-gold-500/40 bg-gold-500/10 text-gold-300':'border-navy-600/50 text-navy-400'}`}>{t}</button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="relative">
-              <select className="input text-sm appearance-none pr-7" value={ex2} onChange={e=>setEx2(e.target.value)}>
-                <option value="">— Select —</option>
-                {examOpts(selStudent,ex2Type).map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
-              </select>
-              <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-400 pointer-events-none"/>
-            </div>
-          </div>
+          <ExaminerSelector
+            label="Examiner 2" value={ex2} onChange={setEx2}
+            type={ex2Type} onTypeChange={t=>{setEx2Type(t);setEx2('');setSpecFilter2('all')}}
+            needsExternal={needsExternal}
+            opts={examOpts(selStudent,ex2Type,specFilter2)}
+            allSpecs={allSpecs} specFilter={specFilter2} onSpecFilter={setSpecFilter2}
+            suggestions={getSuggestions(selStudent,ex2Type)}
+          />
           {saveMsg && <StatusMsg ok={saveMsg.ok} msg={saveMsg.msg}/>}
           <button onClick={handleSave} disabled={saving||!selStudent} className="btn-primary w-full justify-center disabled:opacity-50">
             {saving?<Loader2 size={13} className="animate-spin"/>:<UserCheck size={13}/>}

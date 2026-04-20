@@ -14,12 +14,34 @@ export default function AddStudentModal({ onClose, onSuccess, student: existing 
     thesis_title:    existing?.thesis_title    || '',
     supervisor_id:   existing?.supervisor_id   || '',
     enrollment_year: existing?.enrollment_year || new Date().getFullYear(),
+    research_area:   existing?.research_area   || '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
 
+  const [allSpecs, setAllSpecs] = useState([])
+
   useEffect(() => {
-    getSupervisors().then(setSupervisors).catch(console.error)
+    getSupervisors().then(sups => {
+      setSupervisors(sups)
+    }).catch(console.error)
+
+    // Load all specializations from both internal and external examiners
+    async function loadSpecs() {
+      try {
+        const { supabase } = await import('../lib/supabase')
+        const [{ data: sups }, { data: exts }] = await Promise.all([
+          supabase.from('supervisors').select('specialization').not('specialization','is',null),
+          supabase.from('external_examiners').select('specialization').not('specialization','is',null),
+        ])
+        const specs = [...new Set([
+          ...(sups||[]).map(s=>s.specialization),
+          ...(exts||[]).map(e=>e.specialization),
+        ].filter(Boolean))].sort()
+        setAllSpecs(specs)
+      } catch(e) { console.error(e) }
+    }
+    loadSpecs()
   }, [])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -44,6 +66,7 @@ export default function AddStudentModal({ onClose, onSuccess, student: existing 
             thesis_title:    form.thesis_title,
             supervisor_id:   form.supervisor_id || null,
             enrollment_year: form.enrollment_year,
+            research_area:   form.research_area || null,
             updated_at:      new Date().toISOString(),
           })
           .eq('id', existing.id)
@@ -148,6 +171,20 @@ export default function AddStudentModal({ onClose, onSuccess, student: existing 
                 <option key={s.id} value={s.id}>{s.name} ({s.email})</option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <label className="block text-xs text-navy-400 mb-1">Research Area</label>
+            <select className="input" value={form.research_area}
+              onChange={e => set('research_area', e.target.value)}>
+              <option value="">— Select research area —</option>
+              {allSpecs.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            {allSpecs.length === 0 && (
+              <p className="text-xs text-navy-600 mt-1">Add specializations to examiners first to populate this list.</p>
+            )}
           </div>
 
           {error && (

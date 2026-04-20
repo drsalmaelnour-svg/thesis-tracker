@@ -192,10 +192,11 @@ export default function StudentDetail() {
       <div className="grid grid-cols-3 gap-4">
         {[
           { label: 'Program',    value: student.program },
-          { label: 'Supervisor', value: student.supervisors?.name },
-          { label: 'Thesis',     value: student.thesis_title },
+          { label: 'Supervisor',    value: student.supervisors?.name },
+          { label: 'Research Area', value: student.research_area },
+          { label: 'Thesis',        value: student.thesis_title },
         ].filter(x=>x.value).map(({ label, value }) => (
-          <div key={label} className="card p-4">
+          <div key={label} className={`card p-4 ${label==='Research Area'?'border-gold-500/20':''}`}>
             <p className="text-xs text-navy-400 mb-1">{label}</p>
             <p className="text-sm text-slate-200 leading-relaxed">{value}</p>
           </div>

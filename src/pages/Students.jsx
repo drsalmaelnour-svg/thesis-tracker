@@ -191,6 +191,9 @@ export default function Students() {
                       ) : (
                         <span className="text-xs text-navy-500 italic">Unassigned</span>
                       )}
+                      {student.research_area && (
+                        <span className="inline-block mt-1.5 text-xs text-gold-300/80 bg-gold-500/10 border border-gold-500/20 px-2 py-0.5 rounded-lg">{student.research_area}</span>
+                      )}
                     </td>
                     <td className="p-4 min-w-[180px]">
                       <MilestoneBar studentMilestones={milestones} />
