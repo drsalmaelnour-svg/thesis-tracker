@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Save, Plus, Trash2, Loader2, CheckCircle2, Database, Mail, Key, Users, Calendar } from 'lucide-react'
+import { Save, Plus, Trash2, Loader2, CheckCircle2, Database, Mail, Key, Users, Calendar, Edit2, X } from 'lucide-react'
 import TemplateEditor from '../components/TemplateEditor'
 import { supabase, getSupervisors } from '../lib/supabase'
 
@@ -177,6 +177,8 @@ export default function Settings() {
   const [supervisors, setSupervisors] = useState([])
   const [newSup, setNewSup] = useState({ name: '', email: '', designation: '', institution: '', specialization: '', specOther: '' })
   const [addingSuper, setAddingSuper] = useState(false)
+  const [editSup,     setEditSup]     = useState(null)   // { id, name, email, designation, institution, specialization, specOther }
+  const [savingEdit,  setSavingEdit]  = useState(false)
   const [saved, setSaved] = useState('')
   const [dbStatus, setDbStatus] = useState('checking')
 
@@ -207,6 +209,31 @@ export default function Settings() {
     if (!confirm('Remove this supervisor? Students assigned to them will be unassigned.')) return
     await supabase.from('supervisors').delete().eq('id', id)
     getSupervisors().then(setSupervisors)
+  }
+
+  async function updateSupervisor() {
+    if (!editSup?.name?.trim() || !editSup?.email?.trim()) return
+    setSavingEdit(true)
+    const spec = editSup.specialization === 'Other' ? editSup.specOther : editSup.specialization
+    const { error } = await supabase.from('supervisors').update({
+      name:           editSup.name,
+      email:          editSup.email,
+      designation:    editSup.designation || null,
+      institution:    editSup.institution || null,
+      specialization: spec || null,
+    }).eq('id', editSup.id)
+    if (!error) { setEditSup(null); getSupervisors().then(setSupervisors); setSaved('supervisor'); setTimeout(()=>setSaved(''),3000) }
+    setSavingEdit(false)
+  }
+
+  function startEdit(s) {
+    const knownSpecs = ['Clinical Chemistry','Molecular Biology','Microbiology','Haematology','Immunology']
+    const isOther = s.specialization && !knownSpecs.includes(s.specialization)
+    setEditSup({
+      ...s,
+      specialization: isOther ? 'Other' : (s.specialization || ''),
+      specOther:      isOther ? s.specialization : '',
+    })
   }
 
   return (
@@ -348,22 +375,87 @@ export default function Settings() {
         {supervisors.length > 0 && (
           <div className="space-y-2">
             {supervisors.map(s => (
-              <div key={s.id} className="flex items-center justify-between p-3 rounded-xl bg-navy-800/30 border border-navy-700/30">
-                <div>
-                  <p className="text-sm font-medium text-slate-200">{s.name}</p>
-                  <p className="text-xs text-navy-400">{s.email}</p>
-                  <div className="flex flex-wrap gap-1.5 mt-1">
-                    {s.designation && <span className="text-xs text-navy-300 bg-navy-700/40 border border-navy-600/40 px-2 py-0.5 rounded-lg">{s.designation}</span>}
-                    {s.institution && <span className="text-xs text-navy-300 bg-navy-700/40 border border-navy-600/40 px-2 py-0.5 rounded-lg">{s.institution}</span>}
-                    {s.specialization && <span className="text-xs text-gold-300/80 bg-gold-500/10 border border-gold-500/20 px-2 py-0.5 rounded-lg">{s.specialization}</span>}
+              <div key={s.id} className="rounded-xl bg-navy-800/30 border border-navy-700/30 overflow-hidden">
+
+                {editSup?.id === s.id ? (
+                  /* ── Edit mode ── */
+                  <div className="p-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-navy-400 mb-1">Name *</label>
+                        <input className="input text-sm" value={editSup.name} onChange={e=>setEditSup(p=>({...p,name:e.target.value}))}/>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-navy-400 mb-1">Email *</label>
+                        <input className="input text-sm" type="email" value={editSup.email} onChange={e=>setEditSup(p=>({...p,email:e.target.value}))}/>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-navy-400 mb-1">Designation</label>
+                        <select className="input text-sm" value={editSup.designation||''} onChange={e=>setEditSup(p=>({...p,designation:e.target.value}))}>
+                          <option value="">— Select —</option>
+                          <option>Assistant Professor</option>
+                          <option>Associate Professor</option>
+                          <option>Professor</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-navy-400 mb-1">Institution</label>
+                        <select className="input text-sm" value={editSup.institution||''} onChange={e=>setEditSup(p=>({...p,institution:e.target.value}))}>
+                          <option value="">— Select —</option>
+                          <option>GMU Medical Laboratory Sciences</option>
+                          <option>TRIPM</option>
+                        </select>
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-xs text-navy-400 mb-1">Specialization</label>
+                        <select className="input text-sm" value={editSup.specialization} onChange={e=>setEditSup(p=>({...p,specialization:e.target.value,specOther:''}))}>
+                          <option value="">— Select —</option>
+                          <option>Clinical Chemistry</option>
+                          <option>Molecular Biology</option>
+                          <option>Microbiology</option>
+                          <option>Haematology</option>
+                          <option>Immunology</option>
+                          <option value="Other">Other…</option>
+                        </select>
+                        {editSup.specialization === 'Other' && (
+                          <input className="input text-sm mt-1.5" placeholder="Enter specialization"
+                            value={editSup.specOther} onChange={e=>setEditSup(p=>({...p,specOther:e.target.value}))}/>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={updateSupervisor} disabled={savingEdit} className="btn-primary text-xs disabled:opacity-50">
+                        {savingEdit ? <Loader2 size={12} className="animate-spin"/> : <Save size={12}/>}
+                        {savingEdit ? 'Saving…' : 'Save Changes'}
+                      </button>
+                      <button onClick={()=>setEditSup(null)} className="btn-secondary text-xs">
+                        <X size={12}/> Cancel
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <button
-                  onClick={() => deleteSupervisor(s.id)}
-                  className="btn-ghost p-1.5 rounded-lg text-red-400/60 hover:text-red-400"
-                >
-                  <Trash2 size={14} />
-                </button>
+                ) : (
+                  /* ── View mode ── */
+                  <div className="flex items-center justify-between p-3">
+                    <div>
+                      <p className="text-sm font-medium text-slate-200">{s.name}</p>
+                      <p className="text-xs text-navy-400">{s.email}</p>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {s.designation   && <span className="text-xs text-navy-300 bg-navy-700/40 border border-navy-600/40 px-2 py-0.5 rounded-lg">{s.designation}</span>}
+                        {s.institution   && <span className="text-xs text-navy-300 bg-navy-700/40 border border-navy-600/40 px-2 py-0.5 rounded-lg">{s.institution}</span>}
+                        {s.specialization && <span className="text-xs text-gold-300/80 bg-gold-500/10 border border-gold-500/20 px-2 py-0.5 rounded-lg">{s.specialization}</span>}
+                      </div>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <button onClick={()=>startEdit(s)} className="btn-ghost p-1.5 rounded-lg" title="Edit">
+                        <Edit2 size={13}/>
+                      </button>
+                      <button onClick={()=>deleteSupervisor(s.id)} className="btn-ghost p-1.5 rounded-lg text-red-400/60 hover:text-red-400" title="Delete">
+                        <Trash2 size={13}/>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
               </div>
             ))}
           </div>
