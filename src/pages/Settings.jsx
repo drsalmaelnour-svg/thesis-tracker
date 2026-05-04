@@ -182,14 +182,14 @@ export default function Settings() {
   const [savingEdit,  setSavingEdit]  = useState(false)
   const [saved, setSaved] = useState('')
   const [departments, setDepartments] = useState([])
-  const [newDept, setNewDept] = useState({ name:'', program:'', coordinator_name:'', coordinator_email:'', coordinator_title:'Dr.', hod_name:'', hod_email:'', password:'', primary_color:'#1e3a5f', accent_color:'#d4a843', bg_color:'#f1f5f9' })
+  const [newDept, setNewDept] = useState({ name:'', program:'', program_level:'Postgraduate', coordinator_name:'', coordinator_email:'', coordinator_title:'Dr.', hod_name:'', hod_email:'', password:'', primary_color:'#1e3a5f', accent_color:'#d4a843', bg_color:'#f1f5f9' })
   const [addingDept, setAddingDept] = useState(false)
   const [savingDept, setSavingDept] = useState(false)
   const [editDept,   setEditDept]   = useState(null)
   const [adminConfig, setAdminConfig] = useState({ dean_name:'', dean_email:'', admin_password:'', confirm_password:'' })
   const [savingAdmin, setSavingAdmin] = useState(false)
   const [users,       setUsers]       = useState([])
-  const [inviteForm,  setInviteForm]  = useState({ name:'', title:'Dr.', email:'', role:'coordinator', department_id:'' })
+  const [inviteForm,  setInviteForm]  = useState({ name:'', title:'Dr.', email:'', role:'coordinator', department_id:'', program_level:'Both' })
   const [inviting,    setInviting]    = useState(false)
   const [inviteMsg,   setInviteMsg]   = useState(null)
   const [showInvite,  setShowInvite]  = useState(false)
@@ -251,6 +251,7 @@ export default function Settings() {
         name:             inviteForm.name.trim(),
         title:            inviteForm.title,
         department_id:    (inviteForm.role==='coordinator'||inviteForm.role==='hod') ? inviteForm.department_id||null : null,
+        program_level:    inviteForm.program_level || 'Both',
         is_temp_password: true,
         active:           true,
       }, { onConflict: 'email' }).select().single()
@@ -376,7 +377,7 @@ export default function Settings() {
 
   function startEditDept(d) {
     setEditDept(d)
-    setNewDept({ name:d.name, program:d.program||'', coordinator_name:d.coordinator_name?.replace(/^Dr\.\s*/,'').replace(/^Prof\.\s*/,'')||'', coordinator_email:d.coordinator_email||'', coordinator_title:d.coordinator_title||'Dr.', hod_name:d.hod_name||'', hod_email:d.hod_email||'', password:'', primary_color:d.primary_color||'#1e3a5f', accent_color:d.accent_color||'#d4a843', bg_color:d.bg_color||'#f1f5f9' })
+    setNewDept({ name:d.name, program:d.program||'', program_level:d.program_level||'Postgraduate', coordinator_name:d.coordinator_name?.replace(/^Dr\.\s*/,'').replace(/^Prof\.\s*/,'')||'', coordinator_email:d.coordinator_email||'', coordinator_title:d.coordinator_title||'Dr.', hod_name:d.hod_name||'', hod_email:d.hod_email||'', password:'', primary_color:d.primary_color||'#1e3a5f', accent_color:d.accent_color||'#d4a843', bg_color:d.bg_color||'#f1f5f9' })
     setAddingDept(true)
   }
 
@@ -550,13 +551,23 @@ export default function Settings() {
                   </select>
                 </div>
                 {(inviteForm.role==='coordinator'||inviteForm.role==='hod') && (
-                  <div>
-                    <label className="block text-xs text-navy-400 mb-1">Department *</label>
-                    <select className="input text-sm" value={inviteForm.department_id} onChange={e=>setInviteForm(p=>({...p,department_id:e.target.value}))}>
-                      <option value="">— Select —</option>
-                      {departments.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
-                    </select>
-                  </div>
+                  <>
+                    <div>
+                      <label className="block text-xs text-navy-400 mb-1">Department *</label>
+                      <select className="input text-sm" value={inviteForm.department_id} onChange={e=>setInviteForm(p=>({...p,department_id:e.target.value}))}>
+                        <option value="">— Select —</option>
+                        {departments.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-navy-400 mb-1">Program Level</label>
+                      <select className="input text-sm" value={inviteForm.program_level} onChange={e=>setInviteForm(p=>({...p,program_level:e.target.value}))}>
+                        <option value="Postgraduate">Postgraduate</option>
+                        <option value="Undergraduate">Undergraduate</option>
+                        <option value="Both">Both</option>
+                      </select>
+                    </div>
+                  </>
                 )}
               </div>
               {inviteMsg && (
@@ -648,6 +659,7 @@ export default function Settings() {
                         <p className="text-xs text-navy-400 mt-0.5">{u.email}</p>
                         <div className="flex gap-2 mt-1">
                           {u.departments?.name && <span className="text-xs text-navy-500">{u.departments.name}</span>}
+                          {u.program_level && u.program_level !== 'Both' && <span className="text-xs text-blue-400/70 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded-lg">{u.program_level}</span>}
                           <span className="text-xs text-navy-600">Last login: {u.last_login?new Date(u.last_login).toLocaleDateString('en-GB'):'Never'}</span>
                         </div>
                       </div>

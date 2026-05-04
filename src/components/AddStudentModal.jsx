@@ -13,7 +13,8 @@ export default function AddStudentModal({ onClose, onSuccess, student: existing 
     program:         existing?.program         || '',
     thesis_title:    existing?.thesis_title    || '',
     supervisor_id:   existing?.supervisor_id   || '',
-    enrollment_year: existing?.enrollment_year || new Date().getFullYear(),
+    enrollment_year:  existing?.enrollment_year  || new Date().getFullYear(),
+    program_level:    existing?.program_level    || 'Postgraduate',
     research_area:   existing?.research_area   || '',
   })
   const [saving, setSaving] = useState(false)
@@ -67,6 +68,7 @@ export default function AddStudentModal({ onClose, onSuccess, student: existing 
             thesis_title:    form.thesis_title,
             supervisor_id:   form.supervisor_id || null,
             enrollment_year: form.enrollment_year,
+            program_level:   form.program_level || 'Postgraduate',
             research_area:   form.research_area || null,
             updated_at:      new Date().toISOString(),
           })
@@ -171,6 +173,14 @@ export default function AddStudentModal({ onClose, onSuccess, student: existing 
               {supervisors.map(s => (
                 <option key={s.id} value={s.id}>{s.name} ({s.email})</option>
               ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs text-navy-400 mb-1">Program Level</label>
+            <select className="input" value={form.program_level} onChange={e=>set('program_level',e.target.value)}>
+              <option value="Postgraduate">Postgraduate</option>
+              <option value="Undergraduate">Undergraduate</option>
             </select>
           </div>
 

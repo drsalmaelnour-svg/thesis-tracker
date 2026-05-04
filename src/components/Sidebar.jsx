@@ -5,7 +5,7 @@ import {
   Bell, FileText, ClipboardList, TrendingUp, Calendar,
   Clock, Award, LogOut, Shield, ChevronDown
 } from 'lucide-react'
-import { logout, getSession, isAdmin, getDeptInfo, getRole } from '../lib/auth'
+import { logout, getSession, isAdmin, getDeptInfo, getRole, switchRole, getAvailableRoles } from '../lib/auth'
 import { useTheme } from '../context/ThemeContext'
 import { useRole } from '../context/RoleContext'
 
@@ -42,6 +42,15 @@ export default function Sidebar({ setViewingDept, viewingDept }) {
         .then(({ data }) => setDepts(data || []))
     )
   }, [admin])
+
+  const availableRoles = getAvailableRoles()
+  const [switching, setSwitching] = useState(false)
+
+  async function handleRoleSwitch(newRole) {
+    setSwitching(true)
+    await switchRole(newRole)
+    window.location.reload() // reload to apply new role context
+  }
 
   function handleLogout() { logout(); navigate('/login') }
 
@@ -133,10 +142,25 @@ export default function Sidebar({ setViewingDept, viewingDept }) {
           <p className="text-xs truncate" style={{color:'rgba(255,255,255,0.4)'}}>
             {session?.user?.email || ''}
           </p>
-          <span className="text-xs px-1.5 py-0.5 rounded mt-1 inline-block font-medium"
-            style={{background:`${accentColor}22`, color:accentColor}}>
-            {role || 'admin'}
-          </span>
+          {availableRoles.length > 1 ? (
+            <div className="flex gap-1 mt-1.5 flex-wrap">
+              {availableRoles.map(r => (
+                <button key={r} onClick={() => handleRoleSwitch(r)}
+                  className="text-xs px-2 py-0.5 rounded-lg font-medium transition-all"
+                  style={role===r
+                    ? {background:`${accentColor}33`, color:accentColor, border:`1px solid ${accentColor}55`}
+                    : {background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.4)', border:'1px solid rgba(255,255,255,0.1)'}
+                  }>
+                  {r}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <span className="text-xs px-1.5 py-0.5 rounded mt-1 inline-block font-medium"
+              style={{background:`${accentColor}22`, color:accentColor}}>
+              {role || 'admin'}
+            </span>
+          )}
         </div>
         <button onClick={handleLogout}
           className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs transition-all"

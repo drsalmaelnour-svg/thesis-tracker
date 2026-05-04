@@ -26,6 +26,22 @@ export async function hashPassword(password) {
   return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('')
 }
 
+export async function switchRole(newRole) {
+  const session = getSession()
+  if (!session) return
+  // Allow switching between admin and coordinator if user has dual_role flag
+  if (!session.dual_role) return
+  const updated = { ...session, role: newRole, expires_at: Date.now() + 8*60*60*1000 }
+  localStorage.setItem('gmu_session', JSON.stringify(updated))
+  return updated
+}
+
+export function getAvailableRoles() {
+  const s = getSession()
+  if (!s?.dual_role) return [s?.role].filter(Boolean)
+  return s.dual_roles || [s.role]
+}
+
 export async function login(email, password) {
   const { supabase } = await import('./supabase')
   const emailLower = email.trim().toLowerCase()
@@ -50,11 +66,18 @@ export async function login(email, password) {
   // Update last login
   await supabase.from('users').update({ last_login: new Date().toISOString() }).eq('id', user.id)
 
+  // Check if this user also has a coordinator record (dual role)
+  // Admin with coordinator role in a department
+  const isDualRole = user.role === 'admin' && user.department_id
+  const availableRoles = isDualRole ? ['admin', 'coordinator'] : [user.role]
+
   const dept = user.departments
   return setSession({
     user_id:       user.id,
     role:          user.role,
     department_id: user.department_id,
+    dual_role:     isDualRole,
+    dual_roles:    availableRoles,
     user: { id:user.id, name:user.name, title:user.title, email:user.email },
     department: dept ? {
       id:            dept.id,
