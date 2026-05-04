@@ -193,6 +193,8 @@ export default function Settings() {
   const [inviting,    setInviting]    = useState(false)
   const [inviteMsg,   setInviteMsg]   = useState(null)
   const [showInvite,  setShowInvite]  = useState(false)
+  const [editUser,    setEditUser]    = useState(null)
+  const [savingUser,  setSavingUser]  = useState(false)
   const [dbStatus, setDbStatus] = useState('checking')
 
   useEffect(() => {
@@ -202,6 +204,26 @@ export default function Settings() {
       .catch(() => setDbStatus('error'))
 
     getSupervisors().then(setSupervisors).catch(console.error)
+
+    // Load departments and users for admin
+    async function loadDepts() {
+      try {
+        const { supabase: sb } = await import('../lib/supabase')
+        const { data } = await sb.from('departments').select('*').order('name')
+        setDepartments(data || [])
+      } catch(e) { console.error(e) }
+    }
+
+    async function loadUsers() {
+      try {
+        const { supabase: sb } = await import('../lib/supabase')
+        const { data } = await sb.from('users').select('*, departments(name)').order('role').order('name')
+        setUsers(data || [])
+      } catch(e) { console.error(e) }
+    }
+
+    loadDepts()
+    loadUsers()
   }, [])
 
   async function handleInvite() {
@@ -220,10 +242,35 @@ export default function Settings() {
   }
 
   async function removeUser(id) {
-    if (!confirm('Deactivate this user?')) return
-    const { supabase } = await import('../lib/supabase')
-    await supabase.from('users').update({ active:false }).eq('id', id)
+    if (!confirm('Deactivate this user? They will no longer be able to log in.')) return
+    const { supabase: sb } = await import('../lib/supabase')
+    await sb.from('users').update({ active:false }).eq('id', id)
     setUsers(prev => prev.filter(u => u.id !== id))
+  }
+
+  async function updateUser() {
+    if (!editUser?.name?.trim() || !editUser?.email?.trim()) return
+    setSavingUser(true)
+    try {
+      const { supabase: sb } = await import('../lib/supabase')
+      const payload = {
+        name:          editUser.name,
+        title:         editUser.title,
+        email:         editUser.email.toLowerCase(),
+        role:          editUser.role,
+        department_id: (editUser.role==='coordinator'||editUser.role==='hod') ? editUser.department_id||null : null,
+      }
+      if (editUser.newPassword) {
+        if (editUser.newPassword.length < 8) { alert('Password must be at least 8 characters.'); setSavingUser(false); return }
+        payload.password_hash    = await hashPassword(editUser.newPassword)
+        payload.is_temp_password = false
+      }
+      await sb.from('users').update(payload).eq('id', editUser.id)
+      const { data } = await sb.from('users').select('*, departments(name)').order('role').order('name')
+      setUsers(data || [])
+      setEditUser(null)
+    } catch(e) { console.error(e) }
+    setSavingUser(false)
   }
 
   async function saveDept() {
@@ -463,46 +510,99 @@ export default function Settings() {
             </div>
           )}
 
-          {/* Users table */}
+          {/* Users list */}
           {users.filter(u=>u.active).length > 0 ? (
-            <div className="overflow-x-auto rounded-xl border border-navy-700/40">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="bg-navy-800/60 border-b border-navy-700/50">
-                    <th className="text-left px-4 py-3 text-navy-300 font-semibold">Name</th>
-                    <th className="text-left px-4 py-3 text-navy-300 font-semibold">Email</th>
-                    <th className="text-left px-4 py-3 text-navy-300 font-semibold">Role</th>
-                    <th className="text-left px-4 py-3 text-navy-300 font-semibold">Department</th>
-                    <th className="text-left px-4 py-3 text-navy-300 font-semibold">Last Login</th>
-                    <th className="px-4 py-3"/>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.filter(u=>u.active).map((u,i)=>(
-                    <tr key={u.id} className={`border-b border-navy-700/20 ${i%2===0?'':'bg-navy-800/10'}`}>
-                      <td className="px-4 py-2.5 text-slate-300 font-medium">{u.title} {u.name}</td>
-                      <td className="px-4 py-2.5 text-navy-400">{u.email}</td>
-                      <td className="px-4 py-2.5">
-                        <span className={`px-2 py-0.5 rounded-lg border text-xs font-medium ${
-                          u.role==='admin'       ?'bg-gold-500/10 border-gold-500/30 text-gold-300':
-                          u.role==='coordinator' ?'bg-blue-500/10 border-blue-500/30 text-blue-300':
-                          u.role==='hod'         ?'bg-emerald-500/10 border-emerald-500/30 text-emerald-300':
-                          'bg-purple-500/10 border-purple-500/30 text-purple-300'
-                        }`}>{u.role}</span>
-                      </td>
-                      <td className="px-4 py-2.5 text-navy-400">{u.departments?.name||'—'}</td>
-                      <td className="px-4 py-2.5 text-navy-500">{u.last_login?new Date(u.last_login).toLocaleDateString('en-GB'):'Never'}</td>
-                      <td className="px-4 py-2.5">
-                        {u.role!=='admin' && (
-                          <button onClick={()=>removeUser(u.id)} className="btn-ghost p-1.5 rounded-lg text-red-400/50 hover:text-red-400">
-                            <Trash2 size={12}/>
-                          </button>
+            <div className="space-y-2">
+              {users.filter(u=>u.active).map((u,i)=>(
+                <div key={u.id} className="rounded-xl border border-navy-700/30 overflow-hidden">
+
+                  {/* Edit mode */}
+                  {editUser?.id === u.id ? (
+                    <div className="p-4 space-y-3 bg-navy-800/20">
+                      <p className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Edit User</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs text-navy-400 mb-1">Title</label>
+                          <select className="input text-sm" value={editUser.title||''} onChange={e=>setEditUser(p=>({...p,title:e.target.value}))}>
+                            {['Dr.','Prof.','Mr.','Ms.'].map(t=><option key={t}>{t}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-navy-400 mb-1">Full Name *</label>
+                          <input className="input text-sm" value={editUser.name} onChange={e=>setEditUser(p=>({...p,name:e.target.value}))}/>
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-xs text-navy-400 mb-1">Email *</label>
+                          <input className="input text-sm" type="email" value={editUser.email} onChange={e=>setEditUser(p=>({...p,email:e.target.value}))}/>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-navy-400 mb-1">Role</label>
+                          <select className="input text-sm" value={editUser.role} onChange={e=>setEditUser(p=>({...p,role:e.target.value,department_id:''}))}
+                            disabled={u.role==='admin'}>
+                            <option value="coordinator">Coordinator</option>
+                            <option value="hod">Head of Department</option>
+                            <option value="dean">Dean</option>
+                          </select>
+                        </div>
+                        {(editUser.role==='coordinator'||editUser.role==='hod') && (
+                          <div>
+                            <label className="block text-xs text-navy-400 mb-1">Department</label>
+                            <select className="input text-sm" value={editUser.department_id||''} onChange={e=>setEditUser(p=>({...p,department_id:e.target.value}))}>
+                              <option value="">— Select —</option>
+                              {departments.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
+                            </select>
+                          </div>
                         )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        <div className="col-span-2">
+                          <label className="block text-xs text-navy-400 mb-1">New Password <span className="text-navy-600 font-normal">(leave blank to keep current)</span></label>
+                          <input className="input text-sm" type="password" placeholder="Min 8 characters"
+                            value={editUser.newPassword||''} onChange={e=>setEditUser(p=>({...p,newPassword:e.target.value}))}/>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={updateUser} disabled={savingUser} className="btn-primary text-xs disabled:opacity-50">
+                          {savingUser?<Loader2 size={12} className="animate-spin"/>:<Save size={12}/>}
+                          {savingUser?'Saving…':'Save Changes'}
+                        </button>
+                        <button onClick={()=>setEditUser(null)} className="btn-secondary text-xs"><X size={12}/> Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* View mode */
+                    <div className="flex items-center justify-between p-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-slate-200">{u.title} {u.name}</p>
+                          <span className={`px-2 py-0.5 rounded-lg border text-xs font-medium ${
+                            u.role==='admin'       ?'bg-gold-500/10 border-gold-500/30 text-gold-300':
+                            u.role==='coordinator' ?'bg-blue-500/10 border-blue-500/30 text-blue-300':
+                            u.role==='hod'         ?'bg-emerald-500/10 border-emerald-500/30 text-emerald-300':
+                            'bg-purple-500/10 border-purple-500/30 text-purple-300'
+                          }`}>{u.role}</span>
+                          {u.is_temp_password && (
+                            <span className="text-xs text-amber-400/70 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-lg">temp password</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-navy-400 mt-0.5">{u.email}</p>
+                        <div className="flex gap-2 mt-1">
+                          {u.departments?.name && <span className="text-xs text-navy-500">{u.departments.name}</span>}
+                          <span className="text-xs text-navy-600">Last login: {u.last_login?new Date(u.last_login).toLocaleDateString('en-GB'):'Never'}</span>
+                        </div>
+                      </div>
+                      {u.role !== 'admin' && (
+                        <div className="flex gap-1 shrink-0">
+                          <button onClick={()=>setEditUser({...u, newPassword:''})} className="btn-ghost p-1.5 rounded-lg" title="Edit">
+                            <Edit2 size={13}/>
+                          </button>
+                          <button onClick={()=>removeUser(u.id)} className="btn-ghost p-1.5 rounded-lg text-red-400/50 hover:text-red-400" title="Remove">
+                            <Trash2 size={13}/>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           ) : (
             <p className="text-xs text-navy-500 text-center py-4">No users yet. Invite someone above.</p>
