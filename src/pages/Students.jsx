@@ -50,12 +50,12 @@ export default function Students() {
 
   async function load() {
     setLoading(true)
-    try { setStudents(await getStudentsWithProgress()) }
+    try { setStudents(await getStudentsWithProgress(effectiveDeptId)) }
     catch (e) { console.error(e) }
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [effectiveDeptId])
 
   const filtered = students.filter(s => {
     const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
