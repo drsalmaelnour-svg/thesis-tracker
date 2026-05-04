@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { X, UserPlus, Save, Loader2 } from 'lucide-react'
-import { supabase, getSupervisors, MILESTONES } from '../lib/supabase'
+import { getSupervisors, MILESTONES } from '../lib/supabase'
 
 // Works for both Add and Edit — pass `student` prop to edit
 export default function AddStudentModal({ onClose, onSuccess, student: existing }) {
@@ -32,6 +32,7 @@ export default function AddStudentModal({ onClose, onSuccess, student: existing 
     async function loadSpecs() {
       try {
         const { supabase } = await import('../lib/supabase')
+        const { supabase } = await import('../lib/supabase')
         const [{ data: sups }, { data: exts }] = await Promise.all([
           supabase.from('supervisors').select('specialization').not('specialization','is',null),
           supabase.from('external_examiners').select('specialization').not('specialization','is',null),
@@ -56,6 +57,7 @@ export default function AddStudentModal({ onClose, onSuccess, student: existing 
     setSaving(true)
     setError('')
     try {
+      const { supabase } = await import('../lib/supabase')
       if (isEdit) {
         // Update existing student
         const { error: uErr } = await supabase
