@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Save, Plus, Trash2, Loader2, CheckCircle2, Database, Mail, Key, Users, Calendar, Edit2, X, Building2, Shield, Lock } from 'lucide-react'
+import { Save, Plus, Trash2, Loader2, CheckCircle2, AlertCircle, Database, Mail, Key, Users, Calendar, Edit2, X, Building2, Shield, Lock } from 'lucide-react'
 import { isAdmin, hashPassword, getSession, inviteUser } from '../lib/auth'
 import TemplateEditor from '../components/TemplateEditor'
 import { supabase, getSupervisors } from '../lib/supabase'
@@ -230,14 +230,64 @@ export default function Settings() {
     if (!inviteForm.name.trim() || !inviteForm.email.trim()) return
     setInviting(true); setInviteMsg(null)
     try {
-      await inviteUser(inviteForm)
-      const { supabase } = await import('../lib/supabase')
-      const { data } = await supabase.from('users').select('*, departments(name)').order('role').order('name')
+      const { supabase: sb } = await import('../lib/supabase')
+
+      // Generate temp password
+      const tempPassword = Math.random().toString(36).slice(-8) + 'Aa1!'
+      const hash = await hashPassword(tempPassword)
+
+      // Get department name if needed
+      let deptName = ''
+      if (inviteForm.department_id) {
+        const { data: dept } = await sb.from('departments').select('name').eq('id', inviteForm.department_id).single()
+        deptName = dept?.name || ''
+      }
+
+      // Save user to database
+      const { data: newUser, error: userErr } = await sb.from('users').upsert({
+        email:            inviteForm.email.trim().toLowerCase(),
+        password_hash:    hash,
+        role:             inviteForm.role,
+        name:             inviteForm.name.trim(),
+        title:            inviteForm.title,
+        department_id:    (inviteForm.role==='coordinator'||inviteForm.role==='hod') ? inviteForm.department_id||null : null,
+        is_temp_password: true,
+        active:           true,
+      }, { onConflict: 'email' }).select().single()
+
+      if (userErr) throw new Error('Failed to create user: ' + userErr.message)
+
+      // Send email directly using EmailJS
+      const roleLabel = inviteForm.role==='coordinator'?'Thesis Coordinator':inviteForm.role==='hod'?'Head of Department':'Dean'
+      const loginUrl  = window.location.origin + window.location.pathname.replace(/\/$/, '')
+
+      const { sendStudentEmail } = await import('../lib/emailService')
+      const emailResult = await sendStudentEmail({
+        student: {
+          name:  inviteForm.name.trim(),
+          email: inviteForm.email.trim().toLowerCase(),
+          token: ''
+        },
+        milestoneId: null,
+        subject: `Thesis Coordination System — Your Account Details`,
+        message: `Dear ${inviteForm.title} ${inviteForm.name},\n\nYou have been added to the Thesis Coordination System at Gulf Medical University as ${roleLabel}${deptName ? ` for the Department of ${deptName}` : ''}.\n\nYour login credentials are below:\n\nSystem URL: ${loginUrl}\nEmail: ${inviteForm.email.trim().toLowerCase()}\nPassword: ${tempPassword}\n\nPlease log in and change your password from Settings at your earliest convenience.\n\nBest regards,\nDr. Salma Elnour\nThesis Coordinator\nGulf Medical University`,
+      })
+
+      // Refresh users list
+      const { data } = await sb.from('users').select('*, departments(name)').order('role').order('name')
       setUsers(data || [])
-      setInviteMsg({ ok:true, msg:`Invitation sent to ${inviteForm.email}` })
+
+      if (emailResult?.ok === false) {
+        setInviteMsg({ ok: false, msg: `User created but email failed: ${emailResult.message}. Password: ${tempPassword}` })
+      } else {
+        setInviteMsg({ ok: true, msg: `Invitation sent to ${inviteForm.email}. Temporary password: ${tempPassword}` })
+      }
+
       setInviteForm({ name:'', title:'Dr.', email:'', role:'coordinator', department_id:'' })
       setShowInvite(false)
-    } catch(e) { setInviteMsg({ ok:false, msg:e.message }) }
+    } catch(e) {
+      setInviteMsg({ ok: false, msg: e.message })
+    }
     setInviting(false)
   }
 
@@ -459,6 +509,18 @@ export default function Settings() {
               <Plus size={13}/> Invite User
             </button>
           </div>
+
+          {/* Persistent result message */}
+          {inviteMsg && (
+            <div className={`flex items-start gap-2 px-3 py-2.5 rounded-xl text-xs mb-3 ${
+              inviteMsg.ok
+                ? 'bg-emerald-900/20 border border-emerald-700/40 text-emerald-300'
+                : 'bg-red-900/20 border border-red-700/40 text-red-300'
+            }`}>
+              {inviteMsg.ok ? <CheckCircle2 size={13} className="shrink-0 mt-0.5"/> : <AlertCircle size={13} className="shrink-0 mt-0.5"/>}
+              <p className="leading-relaxed">{inviteMsg.msg}</p>
+            </div>
+          )}
 
           {/* Invite form */}
           {showInvite && (
