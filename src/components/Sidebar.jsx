@@ -6,6 +6,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { logout, getSession, isAdmin, getDeptInfo } from '../lib/auth'
 import { useTheme, DEPT_THEMES } from '../context/ThemeContext'
+import { useRole } from '../context/RoleContext'
 
 const NAV = [
   { to: '/',         icon: LayoutDashboard, label: 'Dashboard' },
@@ -27,6 +28,7 @@ export default function Sidebar({ setViewingDept, viewingDept }) {
   const admin    = isAdmin()
   const dept     = getDeptInfo()
   const theme    = useTheme()
+  const { can }  = useRole()
 
   const [depts, setDepts] = useState([])
   useEffect(() => {

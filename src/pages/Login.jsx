@@ -91,7 +91,10 @@ export default function Login() {
             </button>
           </form>
 
-          <div className="px-8 pb-6 text-center">
+          <div className="px-8 pb-6 text-center space-y-2">
+            <a href="#/forgot-password" className="text-xs text-amber-400/60 hover:text-amber-400 transition-colors">
+              Forgot your password?
+            </a>
             <p className="text-xs text-slate-700">Thesis Coordination System · Gulf Medical University</p>
           </div>
         </div>

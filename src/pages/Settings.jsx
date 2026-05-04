@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Save, Plus, Trash2, Loader2, CheckCircle2, Database, Mail, Key, Users, Calendar, Edit2, X, Building2, Shield, Lock } from 'lucide-react'
-import { isAdmin, hashPassword, getSession } from '../lib/auth'
+import { isAdmin, hashPassword, getSession, inviteUser } from '../lib/auth'
 import TemplateEditor from '../components/TemplateEditor'
 import { supabase, getSupervisors } from '../lib/supabase'
 
@@ -188,6 +188,11 @@ export default function Settings() {
   const [editDept,   setEditDept]   = useState(null)
   const [adminConfig, setAdminConfig] = useState({ dean_name:'', dean_email:'', admin_password:'', confirm_password:'' })
   const [savingAdmin, setSavingAdmin] = useState(false)
+  const [users,       setUsers]       = useState([])
+  const [inviteForm,  setInviteForm]  = useState({ name:'', title:'Dr.', email:'', role:'coordinator', department_id:'' })
+  const [inviting,    setInviting]    = useState(false)
+  const [inviteMsg,   setInviteMsg]   = useState(null)
+  const [showInvite,  setShowInvite]  = useState(false)
   const [dbStatus, setDbStatus] = useState('checking')
 
   useEffect(() => {
@@ -198,6 +203,28 @@ export default function Settings() {
 
     getSupervisors().then(setSupervisors).catch(console.error)
   }, [])
+
+  async function handleInvite() {
+    if (!inviteForm.name.trim() || !inviteForm.email.trim()) return
+    setInviting(true); setInviteMsg(null)
+    try {
+      await inviteUser(inviteForm)
+      const { supabase } = await import('../lib/supabase')
+      const { data } = await supabase.from('users').select('*, departments(name)').order('role').order('name')
+      setUsers(data || [])
+      setInviteMsg({ ok:true, msg:`Invitation sent to ${inviteForm.email}` })
+      setInviteForm({ name:'', title:'Dr.', email:'', role:'coordinator', department_id:'' })
+      setShowInvite(false)
+    } catch(e) { setInviteMsg({ ok:false, msg:e.message }) }
+    setInviting(false)
+  }
+
+  async function removeUser(id) {
+    if (!confirm('Deactivate this user?')) return
+    const { supabase } = await import('../lib/supabase')
+    await supabase.from('users').update({ active:false }).eq('id', id)
+    setUsers(prev => prev.filter(u => u.id !== id))
+  }
 
   async function saveDept() {
     if (!newDept.name.trim() || !newDept.coordinator_email.trim()) return

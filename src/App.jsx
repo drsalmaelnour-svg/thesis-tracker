@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { isLoggedIn, isAdmin, getSession } from './lib/auth'
+import { isLoggedIn, isAdmin, getSession, getRole } from './lib/auth'
 import Login from './pages/Login'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 import { ThemeProvider, DEPT_THEMES } from './context/ThemeContext'
+import { RoleProvider } from './context/RoleContext'
 import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
 import Students from './pages/Students'
@@ -45,8 +48,11 @@ export default function App() {
   return (
     <HashRouter>
     <ThemeProvider viewingDept={viewingDept}>
+    <RoleProvider viewingDept={viewingDept}>
       <Routes>
-        <Route path="/login" element={<Login />} />
+        <Route path="/login"           element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password"  element={<ResetPassword />} />
         {/* Public response route — no sidebar */}
         <Route path="/respond" element={<Respond />} />
         <Route path="/supervisor-respond" element={<SupervisorRespond />} />
@@ -68,6 +74,7 @@ export default function App() {
         <Route path="/student-checkin" element={<StudentCheckin />} />
         <Route path="/settings" element={<Layout setViewingDept={setViewingDept}><Settings /></Layout>} />
       </Routes>
+    </RoleProvider>
     </ThemeProvider>
     </HashRouter>
   )
