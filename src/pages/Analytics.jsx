@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useDept } from '../context/DeptContext'
 import { TrendingUp, Users, CheckCircle2, AlertCircle, RefreshCw, ChevronDown } from 'lucide-react'
 import { getStudentsWithProgress, getStudentCheckins, getSupervisorCheckins, MILESTONES, getCohortAnalytics } from '../lib/supabase'
 
@@ -38,6 +39,7 @@ function StatCard({ label, value, sub, color = 'text-gold-400', icon: Icon }) {
 }
 
 export default function Analytics() {
+  const { effectiveDeptId } = useDept() || {}
   const [students, setStudents]         = useState([])
   const [stuCheckins, setStuCheckins]   = useState([])
   const [supCheckins, setSupCheckins]   = useState([])
@@ -48,7 +50,7 @@ export default function Analytics() {
     setLoading(true)
     try {
       const [s, stc, suc] = await Promise.all([
-        getStudentsWithProgress(),
+        getStudentsWithProgress(effectiveDeptId),
         getStudentCheckins(),
         getSupervisorCheckins(),
       ])
@@ -57,7 +59,7 @@ export default function Analytics() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [effectiveDeptId])
 
   const cohortYears = [...new Set(students.map(s=>s.enrollment_year).filter(Boolean))].sort((a,b)=>b-a)
   const analytics = getCohortAnalytics ? getCohortAnalytics(cohortFilter, students) : null

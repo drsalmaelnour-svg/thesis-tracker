@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useDept } from '../context/DeptContext'
 import {
   FileText, Download, Printer, FileSpreadsheet, Loader2,
   Filter, ChevronDown, RefreshCw, Mail, Send
@@ -500,6 +501,95 @@ async function downloadExcel(rows, filename, sheetName, subtitle = '') {
   XLSX.writeFile(wb, filename)
 }
 
+function openReportInTab(title, subtitle, rows) {
+  if (!rows.length) return
+  const headers = Object.keys(rows[0])
+  const dateStr = new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' })
+
+  const headerCells = headers.map(h =>
+    `<th>${h}</th>`
+  ).join('')
+
+  const bodyRows = rows.map((row, i) =>
+    `<tr class="${i%2===0?'even':'odd'}">${
+      headers.map(h => `<td>${row[h] ?? '—'}</td>`).join('')
+    }</tr>`
+  ).join('')
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${title}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box }
+  body { font-family:Arial,sans-serif; background:#f1f5f9; padding:24px }
+  .page { background:#fff; max-width:1100px; margin:0 auto; border-radius:8px; overflow:hidden; box-shadow:0 2px 16px rgba(0,0,0,0.1) }
+  .header { background:#1e3a5f; padding:20px 28px }
+  .header .inst { font-size:10px; color:#d4a843; font-weight:700; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px }
+  .header h1 { font-size:20px; color:#fff; font-weight:700; margin-bottom:4px }
+  .header .sub { font-size:12px; color:#94a3b8 }
+  .meta { background:#f8fafc; padding:10px 28px; display:flex; justify-content:space-between; border-bottom:1px solid #e2e8f0 }
+  .meta span { font-size:11px; color:#64748b }
+  .meta .conf { font-weight:700 }
+  .table-wrap { overflow-x:auto; padding:0 }
+  table { width:100%; border-collapse:collapse; font-size:12px }
+  thead th { background:#1e3a5f; color:#fff; padding:10px 12px; text-align:left; font-weight:600; border:1px solid #254474; white-space:nowrap }
+  tbody tr.even td { background:#fff }
+  tbody tr.odd td { background:#f1f5f9 }
+  tbody td { padding:8px 12px; color:#1e293b; border:1px solid #e2e8f0 }
+  .accent { height:3px; background:#d4a843; margin:20px 28px 0 }
+  .sig { padding:16px 28px 24px }
+  .sig-line { width:120px; height:1px; background:#d4a843; margin-bottom:8px }
+  .sig .name { font-size:14px; font-weight:700; color:#1e3a5f; margin-bottom:3px }
+  .sig .role { font-size:12px; color:#64748b }
+  .print-bar { max-width:1100px; margin:0 auto 16px; display:flex; gap:10px }
+  .btn { padding:9px 20px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; border:none }
+  .btn-primary { background:#d4a843; color:#0f1f36 }
+  .btn-secondary { background:#fff; color:#1e3a5f; border:1px solid #cbd5e1 }
+  @media print {
+    body { background:#fff; padding:0 }
+    .print-bar { display:none }
+    .page { box-shadow:none; border-radius:0 }
+  }
+</style>
+</head>
+<body>
+<div class="print-bar">
+  <button class="btn btn-primary" onclick="window.print()">&#128438; Print / Save as PDF</button>
+  <button class="btn btn-secondary" onclick="window.close()">Close</button>
+</div>
+<div class="page">
+  <div class="header">
+    <div class="inst">Gulf Medical University — MSc Medical Laboratory Sciences</div>
+    <h1>${title}</h1>
+    ${subtitle ? `<div class="sub">${subtitle}</div>` : ''}
+  </div>
+  <div class="meta">
+    <span>Generated: ${dateStr} &nbsp;|&nbsp; ${rows.length} records</span>
+    <span class="conf">CONFIDENTIAL</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>${headerCells}</tr></thead>
+      <tbody>${bodyRows}</tbody>
+    </table>
+  </div>
+  <div class="accent"></div>
+  <div class="sig">
+    <div class="sig-line"></div>
+    <div class="name">Dr. Salma Elnour</div>
+    <div class="role">Thesis Coordinator &nbsp;·&nbsp; Gulf Medical University</div>
+  </div>
+</div>
+</body>
+</html>`
+
+  const blob = new Blob([html], { type: 'text/html' })
+  const url  = URL.createObjectURL(blob)
+  window.open(url, '_blank')
+}
+
 async function downloadPDF(title, subtitle, rows, filename) {
   await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
   await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js')
@@ -613,6 +703,7 @@ async function downloadPDF(title, subtitle, rows, filename) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function Reports() {
+  const { effectiveDeptId } = useDept() || {}
   const [students,         setStudents]         = useState([])
   const [checkins,         setCheckins]         = useState([])
   const [milGroupsData,    setMilGroupsData]    = useState({})
@@ -638,7 +729,7 @@ export default function Reports() {
       try {
         const { supabase } = await import('../lib/supabase')
         const [studs, chks, grps] = await Promise.all([
-          getStudentsWithProgress(),
+          getStudentsWithProgress(effectiveDeptId),
           getSupervisorCheckins(),
           supabase.from('milestone_groups').select('*').order('group_name'),
         ])

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useDept } from '../context/DeptContext'
 import { Link } from 'react-router-dom'
 import {
   AlertCircle, CheckCircle2, GraduationCap, Mail, Bell,
@@ -62,6 +63,7 @@ function CohortRing({ rate, label, count }) {
 }
 
 export default function Dashboard() {
+  const { effectiveDeptId } = useDept() || {}
   const [students, setStudents]     = useState([])
   const [supCheckins, setSupCheckins] = useState([])
   const [stuCheckins, setStuCheckins] = useState([])
@@ -73,7 +75,7 @@ export default function Dashboard() {
     setLoading(true)
     try {
       const [s, sc, stc, act] = await Promise.all([
-        getStudentsWithProgress(),
+        getStudentsWithProgress(effectiveDeptId),
         getSupervisorCheckins(),
         getStudentCheckins(),
         getRecentActivity(12),
@@ -83,7 +85,7 @@ export default function Dashboard() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [effectiveDeptId])
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   const needsAttention = students.filter(s =>

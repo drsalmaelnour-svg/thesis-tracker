@@ -1,3 +1,4 @@
+import { useDept } from '../context/DeptContext'
 import { useState, useEffect, useRef } from 'react'
 import {
   UserCheck, Users, ChevronDown, Loader2, CheckCircle2,
@@ -367,6 +368,7 @@ function Tab({ label, active, onClick, count }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function Assessments() {
+  const { effectiveDeptId } = useDept() || {}
   const [activeTab,   setActiveTab]   = useState('overview')
   const [students,    setStudents]    = useState([])
   const [supervisors, setSupervisors] = useState([])
@@ -380,7 +382,7 @@ export default function Assessments() {
     try {
       const { supabase } = await import('../lib/supabase')
       const [studs, exts, asgns, sups] = await Promise.all([
-        getStudentsWithProgress(),
+        getStudentsWithProgress(effectiveDeptId),
         getExternalExaminers(),
         getAssessmentAssignments(),
         supabase.from('supervisors').select('*').order('name'),
@@ -391,7 +393,7 @@ export default function Assessments() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [effectiveDeptId])
 
   const cohortYears = [...new Set(students.map(s=>s.enrollment_year).filter(Boolean))].sort((a,b)=>b-a)
   const filtered    = cohort==='all' ? students : students.filter(s=>Number(s.enrollment_year)===Number(cohort))

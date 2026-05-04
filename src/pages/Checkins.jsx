@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useDept } from '../context/DeptContext'
 import {
   Send, Loader2, RefreshCw, AlertCircle, CheckCircle2,
   Clock, Users, ChevronDown, GraduationCap, ClipboardList, Filter
@@ -47,6 +48,7 @@ const WRITING_LABELS = {
 }
 
 export default function Checkins() {
+  const { effectiveDeptId } = useDept() || {}
   const [students, setStudents]           = useState([])
   const [supCheckins, setSupCheckins]     = useState([])
   const [stuCheckins, setStuCheckins]     = useState([])
@@ -64,7 +66,7 @@ export default function Checkins() {
     setLoading(true)
     try {
       const [s, sc, stc] = await Promise.all([
-        getStudentsWithProgress(),
+        getStudentsWithProgress(effectiveDeptId),
         getSupervisorCheckins(),
         getStudentCheckins(),
       ])
@@ -73,7 +75,7 @@ export default function Checkins() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [effectiveDeptId])
 
   const cohortYears = [...new Set(students.map(s => s.enrollment_year).filter(Boolean))].sort((a,b)=>b-a)
   const filtered = cohortFilter === 'all' ? students : students.filter(s => String(s.enrollment_year) === String(cohortFilter))

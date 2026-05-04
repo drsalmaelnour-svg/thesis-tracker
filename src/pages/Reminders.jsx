@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
+import { useDept } from '../context/DeptContext'
 import { Bell, Zap, Clock, Loader2, CheckCircle2, AlertCircle, Play } from 'lucide-react'
 import { getStudentsWithProgress, MILESTONES } from '../lib/supabase'
 import { sendReminder, sendBulkReminders } from '../lib/emailService'
 
 export default function Reminders() {
+  const { effectiveDeptId } = useDept() || {}
   const [students, setStudents] = useState([])
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState({})
@@ -12,7 +14,7 @@ export default function Reminders() {
   const [selectedMilestone, setSelectedMilestone] = useState('')
 
   useEffect(() => {
-    getStudentsWithProgress().then(setStudents).finally(() => setLoading(false))
+    getStudentsWithProgress(effectiveDeptId).then(setStudents).finally(() => setLoading(false))
   }, [])
 
   // Students missing a specific milestone (pending/overdue/in_progress)

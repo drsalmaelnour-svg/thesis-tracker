@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useDept } from '../context/DeptContext'
 import { Mail, Send, Clock, Loader2, ChevronDown, Users } from 'lucide-react'
 import { getStudentsWithProgress, getEmailLog, logEmail, MILESTONES, getEmailTemplates } from '../lib/supabase'
 import { sendStudentEmail, sendSupervisorEmail, sendBulkReminders } from '../lib/emailService'
@@ -6,6 +7,7 @@ import { EMAIL_TEMPLATES } from '../lib/emailTemplates'
 import { formatDistanceToNow } from 'date-fns'
 
 export default function EmailCenter() {
+  const { effectiveDeptId } = useDept() || {}
   const [students, setStudents] = useState([])
   const [log, setLog] = useState([])
   const [loading, setLoading] = useState(true)
@@ -44,7 +46,7 @@ export default function EmailCenter() {
 
     // Load students and email log
     Promise.all([
-      getStudentsWithProgress().then(setStudents),
+      getStudentsWithProgress(effectiveDeptId).then(setStudents),
       getEmailLog().then(setLog),
     ]).finally(() => setLoading(false))
   }, [])

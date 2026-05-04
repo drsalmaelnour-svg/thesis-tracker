@@ -1,3 +1,4 @@
+import { useDept } from '../context/DeptContext'
 import { useState, useEffect, useRef } from 'react'
 import {
   Calendar, Plus, Trash2, Save, Loader2, Send, Upload,
@@ -26,6 +27,7 @@ function blank(cohortYear) {
 }
 
 export default function CalendarPage() {
+  const { effectiveDeptId } = useDept() || {}
   const [students, setStudents]       = useState([])
   const [cohortYears, setCohortYears] = useState([])
   const [activeCohort, setActiveCohort] = useState(null)
@@ -38,7 +40,7 @@ export default function CalendarPage() {
   const fileRef = useRef()
 
   useEffect(() => {
-    getStudentsWithProgress().then(s => {
+    getStudentsWithProgress(effectiveDeptId).then(s => {
       setStudents(s)
       const years = [...new Set(s.map(x=>x.enrollment_year).filter(Boolean))].sort((a,b)=>b-a)
       setCohortYears(years)
