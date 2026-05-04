@@ -7,7 +7,19 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('⚠️  Supabase env vars missing. Copy .env.example to .env and fill in your keys.')
 }
 
-export const supabase = createClient(
+export 
+// ── Dept filter helper ────────────────────────────────────────────────────────
+// Returns department_id for coordinators/HODs, null for admin/dean (see all)
+async function getEffectiveDeptId() {
+  try {
+    const { getDeptId, getRole } = await import('./auth')
+    const role = getRole()
+    if (role === 'admin' || role === 'dean') return null
+    return getDeptId() || null
+  } catch { return null }
+}
+
+const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
   supabaseAnonKey || 'placeholder'
 )
@@ -289,12 +301,15 @@ export async function getStudentActivity(studentId) {
 }
 
 export async function getRecentActivity(limit = 15) {
-  const { data, error } = await supabase
+  const deptId = await getEffectiveDeptId()
+  let q = supabase
     .from('activity_log')
-    .select('*, students(name, student_id)')
+    .select('*, students(name, student_id, department_id)')
     .order('created_at', { ascending: false })
-    .limit(limit)
+    .limit(deptId ? 100 : limit) // fetch more then filter if needed
+  const { data, error } = await q
   if (error) throw error
+  if (deptId) return (data || []).filter(a => a.students?.department_id === deptId).slice(0, limit)
   return data || []
 }
 
@@ -404,15 +419,17 @@ export async function deleteExternalExaminer(id) {
 }
 
 export async function getAssessmentAssignments(filters = {}) {
+  const deptId = await getEffectiveDeptId()
   let q = supabase.from('assessment_assignments').select(`
     *,
-    students ( id, name, student_id, enrollment_year, supervisors(name) ),
+    students ( id, name, student_id, enrollment_year, department_id, supervisors(name) ),
     external_examiners ( id, name, email, designation, institution )
   `).order('assigned_at', { ascending: false })
   if (filters.student_id)      q = q.eq('student_id', filters.student_id)
   if (filters.assessment_type) q = q.eq('assessment_type', filters.assessment_type)
   const { data, error } = await q
   if (error) throw error
+  if (deptId) return (data || []).filter(a => a.students?.department_id === deptId)
   return data || []
 }
 
@@ -517,17 +534,22 @@ export async function getStudentAssessmentResults(studentId) {
 }
 
 export async function getAllSubmissions(cohortStudentIds) {
+  const deptId = await getEffectiveDeptId()
+  let ids = cohortStudentIds
+  if (deptId && (!ids || !ids.length)) {
+    const { data: ds } = await supabase.from('students').select('id').eq('department_id', deptId)
+    ids = (ds || []).map(s => s.id)
+  }
+  if (!ids || !ids.length) return []
   const { data, error } = await supabase
     .from('assessment_submissions')
-    .select(`
-      *,
+    .select(`*,
       assessment_assignments(
         id, examiner_number, examiner_type, examiner_id, student_id,
         external_examiners(name, email, designation),
-        students(id, name, student_id, enrollment_year, supervisors(id, name, email))
-      )
-    `)
-    .in('student_id', cohortStudentIds)
+        students(id, name, student_id, enrollment_year, department_id, supervisors(id, name, email))
+      )`)
+    .in('student_id', ids)
     .order('submitted_at', { ascending: false })
   if (error) throw error
   return data || []
