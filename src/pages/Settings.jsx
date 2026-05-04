@@ -182,7 +182,7 @@ export default function Settings() {
   const [savingEdit,  setSavingEdit]  = useState(false)
   const [saved, setSaved] = useState('')
   const [departments, setDepartments] = useState([])
-  const [newDept, setNewDept] = useState({ name:'', program:'', coordinator_name:'', coordinator_email:'', coordinator_title:'Dr.', hod_name:'', hod_email:'', password:'' })
+  const [newDept, setNewDept] = useState({ name:'', program:'', coordinator_name:'', coordinator_email:'', coordinator_title:'Dr.', hod_name:'', hod_email:'', password:'', primary_color:'#1e3a5f', accent_color:'#d4a843', bg_color:'#f1f5f9' })
   const [addingDept, setAddingDept] = useState(false)
   const [savingDept, setSavingDept] = useState(false)
   const [editDept,   setEditDept]   = useState(null)
@@ -252,7 +252,7 @@ export default function Settings() {
 
   function startEditDept(d) {
     setEditDept(d)
-    setNewDept({ name:d.name, program:d.program||'', coordinator_name:d.coordinator_name?.replace(/^Dr\.\s*/,'').replace(/^Prof\.\s*/,'')||'', coordinator_email:d.coordinator_email||'', coordinator_title:d.coordinator_title||'Dr.', hod_name:d.hod_name||'', hod_email:d.hod_email||'', password:'' })
+    setNewDept({ name:d.name, program:d.program||'', coordinator_name:d.coordinator_name?.replace(/^Dr\.\s*/,'').replace(/^Prof\.\s*/,'')||'', coordinator_email:d.coordinator_email||'', coordinator_title:d.coordinator_title||'Dr.', hod_name:d.hod_name||'', hod_email:d.hod_email||'', password:'', primary_color:d.primary_color||'#1e3a5f', accent_color:d.accent_color||'#d4a843', bg_color:d.bg_color||'#f1f5f9' })
     setAddingDept(true)
   }
 

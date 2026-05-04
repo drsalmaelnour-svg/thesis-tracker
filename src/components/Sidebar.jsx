@@ -1,9 +1,11 @@
 import { NavLink } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import {
-  LayoutDashboard, Users, Mail, Settings, GraduationCap, Bell, FileText, ClipboardList, TrendingUp, Calendar, Clock, Award, LogOut, Building2, Shield
+  LayoutDashboard, Users, Mail, Settings, GraduationCap, Bell, FileText, ClipboardList, TrendingUp, Calendar, Clock, Award, LogOut, Building2, Shield, ChevronDown
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { logout, getSession, isAdmin, getDeptInfo } from '../lib/auth'
+import { useTheme, DEPT_THEMES } from '../context/ThemeContext'
 
 const NAV = [
   { to: '/',         icon: LayoutDashboard, label: 'Dashboard' },
@@ -19,16 +21,23 @@ const NAV = [
   { to: '/settings', icon: Settings,        label: 'Settings'  },
 ]
 
-export default function Sidebar() {
-  const navigate   = useNavigate()
-  const session    = getSession()
-  const admin      = isAdmin()
-  const dept       = getDeptInfo()
+export default function Sidebar({ setViewingDept, viewingDept }) {
+  const navigate = useNavigate()
+  const session  = getSession()
+  const admin    = isAdmin()
+  const dept     = getDeptInfo()
+  const theme    = useTheme()
 
-  function handleLogout() {
-    logout()
-    navigate('/login')
-  }
+  const [depts, setDepts] = useState([])
+  useEffect(() => {
+    if (!admin) return
+    import('../lib/supabase').then(({ supabase }) =>
+      supabase.from('departments').select('id,name,primary_color,accent_color,bg_color').order('name')
+        .then(({ data }) => setDepts(data || []))
+    )
+  }, [admin])
+
+  function handleLogout() { logout(); navigate('/login') }
   return (
     <aside className="w-64 shrink-0 flex flex-col border-r border-navy-700/50 bg-navy-900/40 min-h-screen">
       {/* Logo */}

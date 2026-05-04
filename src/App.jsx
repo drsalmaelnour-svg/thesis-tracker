@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { isLoggedIn } from './lib/auth'
+import { isLoggedIn, isAdmin, getSession } from './lib/auth'
 import Login from './pages/Login'
+import { ThemeProvider, DEPT_THEMES } from './context/ThemeContext'
 import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
 import Students from './pages/Students'
@@ -20,7 +22,7 @@ import ExaminerPortal from './pages/ExaminerPortal'
 import StudentCheckin from './pages/StudentCheckin'
 import Respond from './pages/Respond'
 
-function Layout({ children }) {
+function Layout({ children, setViewingDept }) {
   if (!isLoggedIn()) return <Navigate to="/login" replace />
   return (
     <div className="flex min-h-screen">
@@ -39,8 +41,10 @@ function AuthGuard({ children }) {
 }
 
 export default function App() {
+  const [viewingDept, setViewingDept] = useState(null)
   return (
     <HashRouter>
+    <ThemeProvider viewingDept={viewingDept}>
       <Routes>
         <Route path="/login" element={<Login />} />
         {/* Public response route — no sidebar */}
@@ -48,22 +52,23 @@ export default function App() {
         <Route path="/supervisor-respond" element={<SupervisorRespond />} />
 
         {/* App routes — with sidebar */}
-        <Route path="/" element={<Layout><Dashboard /></Layout>} />
-        <Route path="/students" element={<Layout><Students /></Layout>} />
-        <Route path="/students/:id" element={<Layout><StudentDetail /></Layout>} />
-        <Route path="/emails" element={<Layout><EmailCenter /></Layout>} />
-        <Route path="/reminders" element={<Layout><Reminders /></Layout>} />
-        <Route path="/reports"  element={<Layout><Reports /></Layout>} />
-        <Route path="/checkins"   element={<Layout><Checkins /></Layout>} />
-        <Route path="/analytics"  element={<Layout><Analytics /></Layout>} />
-        <Route path="/calendar"   element={<Layout><CalendarPage /></Layout>} />
-        <Route path="/deadlines"  element={<Layout><Deadlines /></Layout>} />
-        <Route path="/assessments"       element={<Layout><Assessments /></Layout>} />
+        <Route path="/" element={<Layout setViewingDept={setViewingDept}><Dashboard /></Layout>} />
+        <Route path="/students" element={<Layout setViewingDept={setViewingDept}><Students /></Layout>} />
+        <Route path="/students/:id" element={<Layout setViewingDept={setViewingDept}><StudentDetail /></Layout>} />
+        <Route path="/emails" element={<Layout setViewingDept={setViewingDept}><EmailCenter /></Layout>} />
+        <Route path="/reminders" element={<Layout setViewingDept={setViewingDept}><Reminders /></Layout>} />
+        <Route path="/reports"  element={<Layout setViewingDept={setViewingDept}><Reports /></Layout>} />
+        <Route path="/checkins"   element={<Layout setViewingDept={setViewingDept}><Checkins /></Layout>} />
+        <Route path="/analytics"  element={<Layout setViewingDept={setViewingDept}><Analytics /></Layout>} />
+        <Route path="/calendar"   element={<Layout setViewingDept={setViewingDept}><CalendarPage /></Layout>} />
+        <Route path="/deadlines"  element={<Layout setViewingDept={setViewingDept}><Deadlines /></Layout>} />
+        <Route path="/assessments"       element={<Layout setViewingDept={setViewingDept}><Assessments /></Layout>} />
         <Route path="/examiner-response"  element={<ExaminerResponse />} />
         <Route path="/examiner-portal"    element={<ExaminerPortal />} />
         <Route path="/student-checkin" element={<StudentCheckin />} />
-        <Route path="/settings" element={<Layout><Settings /></Layout>} />
+        <Route path="/settings" element={<Layout setViewingDept={setViewingDept}><Settings /></Layout>} />
       </Routes>
+    </ThemeProvider>
     </HashRouter>
   )
 }
