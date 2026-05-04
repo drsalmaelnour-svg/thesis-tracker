@@ -6,6 +6,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import { ThemeProvider, DEPT_THEMES } from './context/ThemeContext'
 import { RoleProvider } from './context/RoleContext'
+import { DeptProvider } from './context/DeptContext'
 import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
 import Students from './pages/Students'
@@ -44,10 +45,20 @@ function AuthGuard({ children }) {
 }
 
 export default function App() {
-  const [viewingDept, setViewingDept] = useState(null)
+  const [viewingDept,  setViewingDept]  = useState(null)
+  const [departments,  setDepartments]  = useState([])
+
+  useEffect(() => {
+    import('./lib/supabase').then(({ supabase }) =>
+      supabase.from('departments').select('id,name,primary_color,accent_color,bg_color').order('name')
+        .then(({ data }) => setDepartments(data || []))
+    )
+  }, [])
+
   return (
     <HashRouter>
     <ThemeProvider viewingDept={viewingDept}>
+    <DeptProvider viewingDept={viewingDept} departments={departments}>
     <RoleProvider viewingDept={viewingDept}>
       <Routes>
         <Route path="/login"           element={<Login />} />
@@ -75,6 +86,7 @@ export default function App() {
         <Route path="/settings" element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept}><Settings /></Layout>} />
       </Routes>
     </RoleProvider>
+    </DeptProvider>
     </ThemeProvider>
     </HashRouter>
   )

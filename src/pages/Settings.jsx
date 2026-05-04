@@ -403,6 +403,113 @@ export default function Settings() {
         </div>
       </Section>
 
+      {/* User Management — admin only */}
+      {isAdmin() && (
+        <Section title="User Management" icon={Users}>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xs text-navy-400">Invite coordinators, heads of department and the dean.</p>
+            <button onClick={()=>setShowInvite(v=>!v)} className="btn-primary text-xs">
+              <Plus size={13}/> Invite User
+            </button>
+          </div>
+
+          {/* Invite form */}
+          {showInvite && (
+            <div className="card p-4 border-gold-500/30 space-y-3 mb-4">
+              <h3 className="text-sm font-semibold text-slate-100">Invite New User</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-navy-400 mb-1">Title</label>
+                  <select className="input text-sm" value={inviteForm.title} onChange={e=>setInviteForm(p=>({...p,title:e.target.value}))}>
+                    {['Dr.','Prof.','Mr.','Ms.'].map(t=><option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-navy-400 mb-1">Full Name *</label>
+                  <input className="input text-sm" placeholder="Jane Smith" value={inviteForm.name} onChange={e=>setInviteForm(p=>({...p,name:e.target.value}))}/>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs text-navy-400 mb-1">Email *</label>
+                  <input className="input text-sm" type="email" placeholder="user@gmu.ac.ae" value={inviteForm.email} onChange={e=>setInviteForm(p=>({...p,email:e.target.value}))}/>
+                </div>
+                <div>
+                  <label className="block text-xs text-navy-400 mb-1">Role *</label>
+                  <select className="input text-sm" value={inviteForm.role} onChange={e=>setInviteForm(p=>({...p,role:e.target.value,department_id:''}))}>
+                    <option value="coordinator">Coordinator</option>
+                    <option value="hod">Head of Department</option>
+                    <option value="dean">Dean</option>
+                  </select>
+                </div>
+                {(inviteForm.role==='coordinator'||inviteForm.role==='hod') && (
+                  <div>
+                    <label className="block text-xs text-navy-400 mb-1">Department *</label>
+                    <select className="input text-sm" value={inviteForm.department_id} onChange={e=>setInviteForm(p=>({...p,department_id:e.target.value}))}>
+                      <option value="">— Select —</option>
+                      {departments.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
+              {inviteMsg && (
+                <p className={`text-xs ${inviteMsg.ok?'text-emerald-400':'text-red-400'}`}>{inviteMsg.msg}</p>
+              )}
+              <div className="flex gap-2">
+                <button onClick={handleInvite} disabled={inviting} className="btn-primary text-xs disabled:opacity-50">
+                  {inviting?<Loader2 size={12} className="animate-spin"/>:<Mail size={12}/>}
+                  {inviting?'Sending…':'Send Invitation'}
+                </button>
+                <button onClick={()=>setShowInvite(false)} className="btn-secondary text-xs"><X size={12}/> Cancel</button>
+              </div>
+            </div>
+          )}
+
+          {/* Users table */}
+          {users.filter(u=>u.active).length > 0 ? (
+            <div className="overflow-x-auto rounded-xl border border-navy-700/40">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-navy-800/60 border-b border-navy-700/50">
+                    <th className="text-left px-4 py-3 text-navy-300 font-semibold">Name</th>
+                    <th className="text-left px-4 py-3 text-navy-300 font-semibold">Email</th>
+                    <th className="text-left px-4 py-3 text-navy-300 font-semibold">Role</th>
+                    <th className="text-left px-4 py-3 text-navy-300 font-semibold">Department</th>
+                    <th className="text-left px-4 py-3 text-navy-300 font-semibold">Last Login</th>
+                    <th className="px-4 py-3"/>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.filter(u=>u.active).map((u,i)=>(
+                    <tr key={u.id} className={`border-b border-navy-700/20 ${i%2===0?'':'bg-navy-800/10'}`}>
+                      <td className="px-4 py-2.5 text-slate-300 font-medium">{u.title} {u.name}</td>
+                      <td className="px-4 py-2.5 text-navy-400">{u.email}</td>
+                      <td className="px-4 py-2.5">
+                        <span className={`px-2 py-0.5 rounded-lg border text-xs font-medium ${
+                          u.role==='admin'       ?'bg-gold-500/10 border-gold-500/30 text-gold-300':
+                          u.role==='coordinator' ?'bg-blue-500/10 border-blue-500/30 text-blue-300':
+                          u.role==='hod'         ?'bg-emerald-500/10 border-emerald-500/30 text-emerald-300':
+                          'bg-purple-500/10 border-purple-500/30 text-purple-300'
+                        }`}>{u.role}</span>
+                      </td>
+                      <td className="px-4 py-2.5 text-navy-400">{u.departments?.name||'—'}</td>
+                      <td className="px-4 py-2.5 text-navy-500">{u.last_login?new Date(u.last_login).toLocaleDateString('en-GB'):'Never'}</td>
+                      <td className="px-4 py-2.5">
+                        {u.role!=='admin' && (
+                          <button onClick={()=>removeUser(u.id)} className="btn-ghost p-1.5 rounded-lg text-red-400/50 hover:text-red-400">
+                            <Trash2 size={12}/>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-xs text-navy-500 text-center py-4">No users yet. Invite someone above.</p>
+          )}
+        </Section>
+      )}
+
       {/* Supervisors */}
       <Section title="Supervisors" icon={Key}>
         {saved === 'supervisor' && (

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useDept } from '../context/DeptContext'
 import { Link } from 'react-router-dom'
 import { UserPlus, Search, Mail, ArrowRight, Upload, Edit2, CheckSquare, Square, ChevronDown, Loader2 } from 'lucide-react'
 import { getStudentsWithProgress, updateMilestoneStatus, MILESTONES, logActivity } from '../lib/supabase'
@@ -15,6 +16,7 @@ const STATUS_LABELS = {
 }
 
 export default function Students() {
+  const { effectiveDeptId } = useDept() || {}
   const [students, setStudents] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
