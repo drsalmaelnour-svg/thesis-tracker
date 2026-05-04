@@ -32,7 +32,6 @@ export default function AddStudentModal({ onClose, onSuccess, student: existing 
     async function loadSpecs() {
       try {
         const { supabase } = await import('../lib/supabase')
-        const { supabase } = await import('../lib/supabase')
         const [{ data: sups }, { data: exts }] = await Promise.all([
           supabase.from('supervisors').select('specialization').not('specialization','is',null),
           supabase.from('external_examiners').select('specialization').not('specialization','is',null),

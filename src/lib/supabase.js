@@ -7,7 +7,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('⚠️  Supabase env vars missing. Copy .env.example to .env and fill in your keys.')
 }
 
-export 
 // ── Dept filter helper ────────────────────────────────────────────────────────
 // Returns department_id for coordinators/HODs, null for admin/dean (see all)
 async function getEffectiveDeptId() {
@@ -19,7 +18,7 @@ async function getEffectiveDeptId() {
   } catch { return null }
 }
 
-const supabase = createClient(
+export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
   supabaseAnonKey || 'placeholder'
 )
