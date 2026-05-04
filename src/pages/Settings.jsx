@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Save, Plus, Trash2, Loader2, CheckCircle2, Database, Mail, Key, Users, Calendar, Edit2, X } from 'lucide-react'
+import { Save, Plus, Trash2, Loader2, CheckCircle2, Database, Mail, Key, Users, Calendar, Edit2, X, Building2, Shield, Lock } from 'lucide-react'
+import { isAdmin, hashPassword, getSession } from '../lib/auth'
 import TemplateEditor from '../components/TemplateEditor'
 import { supabase, getSupervisors } from '../lib/supabase'
 
@@ -180,6 +181,13 @@ export default function Settings() {
   const [editSup,     setEditSup]     = useState(null)   // { id, name, email, designation, institution, specialization, specOther }
   const [savingEdit,  setSavingEdit]  = useState(false)
   const [saved, setSaved] = useState('')
+  const [departments, setDepartments] = useState([])
+  const [newDept, setNewDept] = useState({ name:'', program:'', coordinator_name:'', coordinator_email:'', coordinator_title:'Dr.', hod_name:'', hod_email:'', password:'' })
+  const [addingDept, setAddingDept] = useState(false)
+  const [savingDept, setSavingDept] = useState(false)
+  const [editDept,   setEditDept]   = useState(null)
+  const [adminConfig, setAdminConfig] = useState({ dean_name:'', dean_email:'', admin_password:'', confirm_password:'' })
+  const [savingAdmin, setSavingAdmin] = useState(false)
   const [dbStatus, setDbStatus] = useState('checking')
 
   useEffect(() => {
@@ -190,6 +198,63 @@ export default function Settings() {
 
     getSupervisors().then(setSupervisors).catch(console.error)
   }, [])
+
+  async function saveDept() {
+    if (!newDept.name.trim() || !newDept.coordinator_email.trim()) return
+    setSavingDept(true)
+    try {
+      const { supabase } = await import('../lib/supabase')
+      const payload = {
+        name:              newDept.name.trim(),
+        program:           newDept.program.trim() || null,
+        coordinator_name:  `${newDept.coordinator_title} ${newDept.coordinator_name}`.trim(),
+        coordinator_email: newDept.coordinator_email.trim().toLowerCase(),
+        coordinator_title: newDept.coordinator_title,
+        hod_name:          newDept.hod_name.trim() || null,
+        hod_email:         newDept.hod_email.trim().toLowerCase() || null,
+      }
+      if (newDept.password) payload.coordinator_password_hash = await hashPassword(newDept.password)
+      if (editDept) {
+        await supabase.from('departments').update(payload).eq('id', editDept.id)
+      } else {
+        await supabase.from('departments').insert(payload)
+      }
+      const { data } = await supabase.from('departments').select('*').order('name')
+      setDepartments(data || [])
+      setNewDept({ name:'', program:'', coordinator_name:'', coordinator_email:'', coordinator_title:'Dr.', hod_name:'', hod_email:'', password:'' })
+      setAddingDept(false); setEditDept(null)
+    } catch(e) { console.error(e) }
+    setSavingDept(false)
+  }
+
+  async function saveAdminConfig() {
+    setSavingAdmin(true)
+    try {
+      const { supabase } = await import('../lib/supabase')
+      const payload = { dean_name: adminConfig.dean_name, dean_email: adminConfig.dean_email }
+      if (adminConfig.admin_password) {
+        if (adminConfig.admin_password !== adminConfig.confirm_password) {
+          alert('Passwords do not match.'); setSavingAdmin(false); return
+        }
+        payload.admin_password_hash = await hashPassword(adminConfig.admin_password)
+      }
+      const { data: existing } = await supabase.from('system_config').select('id').single()
+      if (existing) {
+        await supabase.from('system_config').update(payload).eq('id', existing.id)
+      } else {
+        await supabase.from('system_config').insert(payload)
+      }
+      setAdminConfig(a => ({ ...a, admin_password:'', confirm_password:'' }))
+      setSaved('admin'); setTimeout(() => setSaved(''), 3000)
+    } catch(e) { console.error(e) }
+    setSavingAdmin(false)
+  }
+
+  function startEditDept(d) {
+    setEditDept(d)
+    setNewDept({ name:d.name, program:d.program||'', coordinator_name:d.coordinator_name?.replace(/^Dr\.\s*/,'').replace(/^Prof\.\s*/,'')||'', coordinator_email:d.coordinator_email||'', coordinator_title:d.coordinator_title||'Dr.', hod_name:d.hod_name||'', hod_email:d.hod_email||'', password:'' })
+    setAddingDept(true)
+  }
 
   async function addSupervisor() {
     if (!newSup.name.trim() || !newSup.email.trim()) return

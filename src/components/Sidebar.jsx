@@ -1,7 +1,9 @@
 import { NavLink } from 'react-router-dom'
 import {
-  LayoutDashboard, Users, Mail, Settings, GraduationCap, Bell, FileText, ClipboardList, TrendingUp, Calendar, Clock, Award
+  LayoutDashboard, Users, Mail, Settings, GraduationCap, Bell, FileText, ClipboardList, TrendingUp, Calendar, Clock, Award, LogOut, Building2, Shield
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { logout, getSession, isAdmin, getDeptInfo } from '../lib/auth'
 
 const NAV = [
   { to: '/',         icon: LayoutDashboard, label: 'Dashboard' },
@@ -18,6 +20,15 @@ const NAV = [
 ]
 
 export default function Sidebar() {
+  const navigate   = useNavigate()
+  const session    = getSession()
+  const admin      = isAdmin()
+  const dept       = getDeptInfo()
+
+  function handleLogout() {
+    logout()
+    navigate('/login')
+  }
   return (
     <aside className="w-64 shrink-0 flex flex-col border-r border-navy-700/50 bg-navy-900/40 min-h-screen">
       {/* Logo */}

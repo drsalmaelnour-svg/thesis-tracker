@@ -1,12 +1,6 @@
-/**
- * Thesis Coordination System
- * © 2025 Dr Salma Elnour. All rights reserved.
- *
- * This file is part of proprietary software owned by Dr Salma Elnour.
- * Unauthorised copying, modification, or distribution is strictly prohibited.
- * See LICENSE for full terms.
- */
-import { HashRouter, Routes, Route } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { isLoggedIn } from './lib/auth'
+import Login from './pages/Login'
 import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
 import Students from './pages/Students'
@@ -27,6 +21,7 @@ import StudentCheckin from './pages/StudentCheckin'
 import Respond from './pages/Respond'
 
 function Layout({ children }) {
+  if (!isLoggedIn()) return <Navigate to="/login" replace />
   return (
     <div className="flex min-h-screen">
       <Sidebar />
@@ -37,10 +32,17 @@ function Layout({ children }) {
   )
 }
 
+function AuthGuard({ children }) {
+  const location = useLocation()
+  if (!isLoggedIn()) return <Navigate to="/login" state={{ from: location }} replace />
+  return children
+}
+
 export default function App() {
   return (
     <HashRouter>
       <Routes>
+        <Route path="/login" element={<Login />} />
         {/* Public response route — no sidebar */}
         <Route path="/respond" element={<Respond />} />
         <Route path="/supervisor-respond" element={<SupervisorRespond />} />
@@ -62,9 +64,6 @@ export default function App() {
         <Route path="/student-checkin" element={<StudentCheckin />} />
         <Route path="/settings" element={<Layout><Settings /></Layout>} />
       </Routes>
-      <footer style={{ textAlign: 'center', padding: '1rem', fontSize: '0.75rem', color: '#6b7280', marginTop: '2rem' }}>
-        © {new Date().getFullYear()} Dr Salma Elnour. All rights reserved. | Thesis Coordination System — Proprietary Software
-      </footer>
     </HashRouter>
   )
 }
