@@ -24,8 +24,19 @@ export const MILESTONES = [
   { id: 'thesis_submission',name: 'Thesis Submission',        order: 7, icon: '🎓' },
 ]
 
-export async function getStudentsWithProgress() {
-  const { data: students, error } = await supabase
+export async function getStudentsWithProgress(deptId = null) {
+  // Auto-detect from session if not passed
+  if (!deptId) {
+    try {
+      const { getDeptId, getRole } = await import('./auth')
+      const role = getRole()
+      if (role !== 'admin' && role !== 'dean') {
+        deptId = getDeptId()
+      }
+    } catch(e) { /* ignore */ }
+  }
+
+  let q = supabase
     .from('students')
     .select(`
       *,
@@ -34,6 +45,9 @@ export async function getStudentsWithProgress() {
     `)
     .order('name')
 
+  if (deptId) q = q.eq('department_id', deptId)
+
+  const { data: students, error } = await q
   if (error) throw error
   return students || []
 }
