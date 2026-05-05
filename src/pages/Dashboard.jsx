@@ -63,7 +63,7 @@ function CohortRing({ rate, label, count }) {
 }
 
 export default function Dashboard() {
-  const { effectiveDeptId, effectiveProgLevel } = useDept() || {}
+  const { effectiveDeptId, effectiveProgLevel, viewingDept, viewingLevel } = useDept() || {}
   const [students, setStudents]     = useState([])
   const [supCheckins, setSupCheckins] = useState([])
   const [stuCheckins, setStuCheckins] = useState([])
@@ -85,7 +85,7 @@ export default function Dashboard() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [effectiveDeptId, effectiveProgLevel])
+  useEffect(() => { load() }, [effectiveDeptId, effectiveProgLevel, viewingDept, viewingLevel])
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   const needsAttention = students.filter(s =>
