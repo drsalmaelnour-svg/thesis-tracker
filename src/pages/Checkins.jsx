@@ -48,7 +48,7 @@ const WRITING_LABELS = {
 }
 
 export default function Checkins() {
-  const { effectiveDeptId, effectiveProgLevel } = useDept() || {}
+  const { effectiveDeptId, effectiveProgLevel, viewingDept, viewingLevel } = useDept() || {}
   const [students, setStudents]           = useState([])
   const [supCheckins, setSupCheckins]     = useState([])
   const [stuCheckins, setStuCheckins]     = useState([])
@@ -75,7 +75,7 @@ export default function Checkins() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [effectiveDeptId, effectiveProgLevel])
+  useEffect(() => { load() }, [effectiveDeptId, effectiveProgLevel, viewingDept, viewingLevel])
 
   const cohortYears = [...new Set(students.map(s => s.enrollment_year).filter(Boolean))].sort((a,b)=>b-a)
   const filtered = cohortFilter === 'all' ? students : students.filter(s => String(s.enrollment_year) === String(cohortFilter))
