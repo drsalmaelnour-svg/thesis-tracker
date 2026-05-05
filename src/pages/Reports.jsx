@@ -726,7 +726,7 @@ async function downloadPDF(title, subtitle, rows, filename) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function Reports() {
-  const { effectiveDeptId, effectiveProgLevel } = useDept() || {}
+  const { effectiveDeptId, effectiveProgLevel, viewingDept, viewingLevel } = useDept() || {}
   const [students,         setStudents]         = useState([])
   const [checkins,         setCheckins]         = useState([])
   const [milGroupsData,    setMilGroupsData]    = useState({})
