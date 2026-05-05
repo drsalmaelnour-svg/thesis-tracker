@@ -368,7 +368,7 @@ function Tab({ label, active, onClick, count }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function Assessments() {
-  const { effectiveDeptId, effectiveProgLevel } = useDept() || {}
+  const { effectiveDeptId, effectiveProgLevel, viewingDept, viewingLevel } = useDept() || {}
   const [activeTab,   setActiveTab]   = useState('overview')
   const [students,    setStudents]    = useState([])
   const [supervisors, setSupervisors] = useState([])
@@ -393,7 +393,7 @@ export default function Assessments() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [effectiveDeptId, effectiveProgLevel])
+  useEffect(() => { load() }, [effectiveDeptId, effectiveProgLevel, viewingDept, viewingLevel])
 
   const cohortYears = [...new Set(students.map(s=>s.enrollment_year).filter(Boolean))].sort((a,b)=>b-a)
   const filtered    = cohort==='all' ? students : students.filter(s=>Number(s.enrollment_year)===Number(cohort))
