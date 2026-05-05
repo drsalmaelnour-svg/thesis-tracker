@@ -9,7 +9,25 @@ import { sendStudentEmail } from '../lib/emailService'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const INSTITUTION = 'Gulf Medical University'
-const SIGNATURE   = { name: 'Dr. Salma Elnour', title: 'Thesis Coordinator' }
+
+function getSignatures() {
+  try {
+    const session = JSON.parse(localStorage.getItem('gmu_session') || '{}')
+    const coordinator = {
+      name:  `${session.user?.title || ''} ${session.user?.name || 'Coordinator'}`.trim(),
+      title: session.user?.role === 'coordinator' ? 'Thesis Coordinator' :
+             session.user?.role === 'hod' ? 'Head of Department' :
+             session.user?.role === 'dean' ? 'Dean' : 'Thesis Coordinator',
+    }
+    const hod  = session.department?.hod  || null
+    const dean = session.dean || null
+    return { coordinator, hod, dean }
+  } catch {
+    return { coordinator: { name: 'Dr. Salma Elnour', title: 'Thesis Coordinator' }, hod: null, dean: null }
+  }
+}
+
+const SIGNATURE = getSignatures().coordinator
 
 const FIELD_LABELS = {
   orcid_id:         'ORCID iD',
@@ -386,9 +404,12 @@ async function downloadExcel(rows, filename, sheetName, subtitle = '') {
   wsData.push(Array(colCount).fill(''))
 
   // Signature rows
-  const sigRow1 = Array(colCount).fill(''); sigRow1[0] = 'Dr. Salma Elnour'
-  const sigRow2 = Array(colCount).fill(''); sigRow2[0] = 'Thesis Coordinator'
+  const { coordinator: excelCoord, hod: excelHod, dean: excelDean } = getSignatures()
+  const sigRow1 = Array(colCount).fill(''); sigRow1[0] = excelCoord.name
+  const sigRow2 = Array(colCount).fill(''); sigRow2[0] = excelCoord.title
   const sigRow3 = Array(colCount).fill(''); sigRow3[0] = 'Gulf Medical University'
+  if (excelHod?.name) { sigRow1[2] = excelHod.name; sigRow2[2] = 'Head of Department' }
+  if (excelDean?.name) { sigRow1[4] = excelDean.name; sigRow2[4] = 'Dean' }
   wsData.push(sigRow1, sigRow2, sigRow3)
 
   const ws = XLSX.utils.aoa_to_sheet(wsData)
@@ -502,6 +523,7 @@ async function downloadExcel(rows, filename, sheetName, subtitle = '') {
 }
 
 function openReportInTab(title, subtitle, rows) {
+  const sigs = getSignatures()
   if (!rows.length) return
   const headers = Object.keys(rows[0])
   const dateStr = new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' })
@@ -543,6 +565,7 @@ function openReportInTab(title, subtitle, rows) {
   .sig-line { width:120px; height:1px; background:#d4a843; margin-bottom:8px }
   .sig .name { font-size:14px; font-weight:700; color:#1e3a5f; margin-bottom:3px }
   .sig .role { font-size:12px; color:#64748b }
+  .sig-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap:24px }
   .print-bar { max-width:1100px; margin:0 auto 16px; display:flex; gap:10px }
   .btn { padding:9px 20px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; border:none }
   .btn-primary { background:#d4a843; color:#0f1f36 }
@@ -703,7 +726,7 @@ async function downloadPDF(title, subtitle, rows, filename) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function Reports() {
-  const { effectiveDeptId } = useDept() || {}
+  const { effectiveDeptId, effectiveProgLevel } = useDept() || {}
   const [students,         setStudents]         = useState([])
   const [checkins,         setCheckins]         = useState([])
   const [milGroupsData,    setMilGroupsData]    = useState({})
@@ -729,7 +752,7 @@ export default function Reports() {
       try {
         const { supabase } = await import('../lib/supabase')
         const [studs, chks, grps] = await Promise.all([
-          getStudentsWithProgress(effectiveDeptId),
+          getStudentsWithProgress(effectiveDeptId, effectiveProgLevel),
           getSupervisorCheckins(),
           supabase.from('milestone_groups').select('*').order('group_name'),
         ])
@@ -891,12 +914,19 @@ export default function Reports() {
   <!-- Gold accent line -->
   <div style="height:3px;background:linear-gradient(90deg,#d4a843,#f0c060);margin-top:16px"></div>
 
-  <!-- Signature -->
-  <div style="padding:16px 0 0">
-    <div style="width:120px;height:1px;background:#d4a843;margin-bottom:8px"></div>
-    <p style="margin:0;font-size:13px;font-weight:700;color:#1e3a5f">${SIGNATURE.name}</p>
-    <p style="margin:2px 0 0;font-size:11px;color:#64748b">${SIGNATURE.title}</p>
-    <p style="margin:2px 0 0;font-size:11px;color:#64748b">${INSTITUTION}</p>
+  <!-- Signatures -->
+  <div style="padding:16px 0 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:24px">
+    ${[
+      { name: SIGNATURE.name, title: SIGNATURE.title },
+      ...(sigs.hod?.name  ? [{ name: sigs.hod.name,  title: 'Head of Department' }] : []),
+      ...(sigs.dean?.name ? [{ name: sigs.dean.name, title: 'Dean' }] : []),
+    ].map(s => `
+      <div>
+        <div style="width:100px;height:1px;background:#d4a843;margin-bottom:8px"></div>
+        <p style="margin:0;font-size:13px;font-weight:700;color:#1e3a5f">${s.name}</p>
+        <p style="margin:2px 0 0;font-size:11px;color:#64748b">${s.title}</p>
+        <p style="margin:2px 0 0;font-size:11px;color:#64748b">${INSTITUTION}</p>
+      </div>`).join('')}
   </div>
 
 </div>`
