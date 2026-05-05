@@ -368,7 +368,7 @@ function Tab({ label, active, onClick, count }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function Assessments() {
-  const { effectiveDeptId } = useDept() || {}
+  const { effectiveDeptId, effectiveProgLevel } = useDept() || {}
   const [activeTab,   setActiveTab]   = useState('overview')
   const [students,    setStudents]    = useState([])
   const [supervisors, setSupervisors] = useState([])
@@ -382,7 +382,7 @@ export default function Assessments() {
     try {
       const { supabase } = await import('../lib/supabase')
       const [studs, exts, asgns, sups] = await Promise.all([
-        getStudentsWithProgress(effectiveDeptId),
+        getStudentsWithProgress(effectiveDeptId, effectiveProgLevel),
         getExternalExaminers(),
         getAssessmentAssignments(),
         supabase.from('supervisors').select('*').order('name'),
@@ -393,7 +393,7 @@ export default function Assessments() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [effectiveDeptId])
+  useEffect(() => { load() }, [effectiveDeptId, effectiveProgLevel])
 
   const cohortYears = [...new Set(students.map(s=>s.enrollment_year).filter(Boolean))].sort((a,b)=>b-a)
   const filtered    = cohort==='all' ? students : students.filter(s=>Number(s.enrollment_year)===Number(cohort))
