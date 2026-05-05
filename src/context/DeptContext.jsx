@@ -21,13 +21,13 @@ export function DeptProvider({ children, viewingDept, viewingLevel, departments 
         effectiveProgLevel = session.program_level
       }
     } catch { /* ignore */ }
-  } else if (admin && viewingDept && departments?.length) {
+  } else if ((admin || dean) && viewingDept && departments?.length) {
     const d = departments.find(x => x.name === viewingDept)
     effectiveDeptId = d?.id || null
   }
 
-  // Admin can filter by program level via viewingLevel
-  if (admin && viewingLevel && viewingLevel !== 'All') {
+  // Admin and Dean can filter by program level via viewingLevel
+  if ((admin || dean) && viewingLevel && viewingLevel !== 'All') {
     effectiveProgLevel = viewingLevel
   }
 
