@@ -26,11 +26,11 @@ import ExaminerPortal from './pages/ExaminerPortal'
 import StudentCheckin from './pages/StudentCheckin'
 import Respond from './pages/Respond'
 
-function Layout({ children, setViewingDept, viewingDept }) {
+function Layout({ children, setViewingDept, viewingDept, setViewingLevel, viewingLevel }) {
   if (!isLoggedIn()) return <Navigate to="/login" replace />
   return (
     <div className="flex min-h-screen">
-      <Sidebar setViewingDept={setViewingDept} viewingDept={viewingDept}/>
+      <Sidebar setViewingDept={setViewingDept} viewingDept={viewingDept} setViewingLevel={setViewingLevel} viewingLevel={viewingLevel}/>
       <main className="flex-1 overflow-y-auto">
         {children}
       </main>
@@ -46,6 +46,7 @@ function AuthGuard({ children }) {
 
 export default function App() {
   const [viewingDept,  setViewingDept]  = useState(null)
+  const [viewingLevel, setViewingLevel] = useState('All')
   const [departments,  setDepartments]  = useState([])
 
   useEffect(() => {
@@ -58,7 +59,7 @@ export default function App() {
   return (
     <HashRouter>
     <ThemeProvider viewingDept={viewingDept}>
-    <DeptProvider viewingDept={viewingDept} departments={departments}>
+    <DeptProvider viewingDept={viewingDept} viewingLevel={viewingLevel} departments={departments}>
     <RoleProvider viewingDept={viewingDept}>
       <Routes>
         <Route path="/login"           element={<Login />} />
@@ -69,21 +70,21 @@ export default function App() {
         <Route path="/supervisor-respond" element={<SupervisorRespond />} />
 
         {/* App routes — with sidebar */}
-        <Route path="/" element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept}><Dashboard /></Layout>} />
-        <Route path="/students" element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept}><Students /></Layout>} />
-        <Route path="/students/:id" element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept}><StudentDetail /></Layout>} />
-        <Route path="/emails" element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept}><EmailCenter /></Layout>} />
-        <Route path="/reminders" element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept}><Reminders /></Layout>} />
-        <Route path="/reports"  element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept}><Reports /></Layout>} />
-        <Route path="/checkins"   element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept}><Checkins /></Layout>} />
-        <Route path="/analytics"  element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept}><Analytics /></Layout>} />
-        <Route path="/calendar"   element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept}><CalendarPage /></Layout>} />
-        <Route path="/deadlines"  element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept}><Deadlines /></Layout>} />
-        <Route path="/assessments"       element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept}><Assessments /></Layout>} />
+        <Route path="/" element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept} setViewingLevel={setViewingLevel} viewingLevel={viewingLevel}><Dashboard /></Layout>} />
+        <Route path="/students" element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept} setViewingLevel={setViewingLevel} viewingLevel={viewingLevel}><Students /></Layout>} />
+        <Route path="/students/:id" element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept} setViewingLevel={setViewingLevel} viewingLevel={viewingLevel}><StudentDetail /></Layout>} />
+        <Route path="/emails" element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept} setViewingLevel={setViewingLevel} viewingLevel={viewingLevel}><EmailCenter /></Layout>} />
+        <Route path="/reminders" element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept} setViewingLevel={setViewingLevel} viewingLevel={viewingLevel}><Reminders /></Layout>} />
+        <Route path="/reports"  element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept} setViewingLevel={setViewingLevel} viewingLevel={viewingLevel}><Reports /></Layout>} />
+        <Route path="/checkins"   element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept} setViewingLevel={setViewingLevel} viewingLevel={viewingLevel}><Checkins /></Layout>} />
+        <Route path="/analytics"  element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept} setViewingLevel={setViewingLevel} viewingLevel={viewingLevel}><Analytics /></Layout>} />
+        <Route path="/calendar"   element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept} setViewingLevel={setViewingLevel} viewingLevel={viewingLevel}><CalendarPage /></Layout>} />
+        <Route path="/deadlines"  element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept} setViewingLevel={setViewingLevel} viewingLevel={viewingLevel}><Deadlines /></Layout>} />
+        <Route path="/assessments"       element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept} setViewingLevel={setViewingLevel} viewingLevel={viewingLevel}><Assessments /></Layout>} />
         <Route path="/examiner-response"  element={<ExaminerResponse />} />
         <Route path="/examiner-portal"    element={<ExaminerPortal />} />
         <Route path="/student-checkin" element={<StudentCheckin />} />
-        <Route path="/settings" element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept}><Settings /></Layout>} />
+        <Route path="/settings" element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept} setViewingLevel={setViewingLevel} viewingLevel={viewingLevel}><Settings /></Layout>} />
       </Routes>
     </RoleProvider>
     </DeptProvider>
