@@ -48,7 +48,7 @@ const WRITING_LABELS = {
 }
 
 export default function Checkins() {
-  const { effectiveDeptId } = useDept() || {}
+  const { effectiveDeptId, effectiveProgLevel } = useDept() || {}
   const [students, setStudents]           = useState([])
   const [supCheckins, setSupCheckins]     = useState([])
   const [stuCheckins, setStuCheckins]     = useState([])
@@ -66,7 +66,7 @@ export default function Checkins() {
     setLoading(true)
     try {
       const [s, sc, stc] = await Promise.all([
-        getStudentsWithProgress(effectiveDeptId),
+        getStudentsWithProgress(effectiveDeptId, effectiveProgLevel),
         getSupervisorCheckins(),
         getStudentCheckins(),
       ])
@@ -75,7 +75,7 @@ export default function Checkins() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [effectiveDeptId])
+  useEffect(() => { load() }, [effectiveDeptId, effectiveProgLevel])
 
   const cohortYears = [...new Set(students.map(s => s.enrollment_year).filter(Boolean))].sort((a,b)=>b-a)
   const filtered = cohortFilter === 'all' ? students : students.filter(s => String(s.enrollment_year) === String(cohortFilter))
