@@ -27,7 +27,7 @@ function blank(cohortYear) {
 }
 
 export default function CalendarPage() {
-  const { effectiveDeptId } = useDept() || {}
+  const { effectiveDeptId, effectiveProgLevel, viewingDept, viewingLevel } = useDept() || {}
   const [students, setStudents]       = useState([])
   const [cohortYears, setCohortYears] = useState([])
   const [activeCohort, setActiveCohort] = useState(null)
@@ -40,7 +40,7 @@ export default function CalendarPage() {
   const fileRef = useRef()
 
   useEffect(() => {
-    getStudentsWithProgress(effectiveDeptId).then(s => {
+    getStudentsWithProgress(effectiveDeptId, effectiveProgLevel).then(s => {
       setStudents(s)
       const years = [...new Set(s.map(x=>x.enrollment_year).filter(Boolean))].sort((a,b)=>b-a)
       setCohortYears(years)
