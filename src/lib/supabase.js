@@ -37,12 +37,17 @@ export const MILESTONES = [
 
 export async function getStudentsWithProgress(deptId = null) {
   // Auto-detect from session if not passed
+  let programLevel = null
   if (!deptId) {
     try {
-      const { getDeptId, getRole } = await import('./auth')
+      const { getDeptId, getRole, getSession } = await import('./auth')
       const role = getRole()
       if (role !== 'admin' && role !== 'dean') {
         deptId = getDeptId()
+        const session = getSession()
+        if (session?.program_level && session.program_level !== 'Both') {
+          programLevel = session.program_level
+        }
       }
     } catch(e) { /* ignore */ }
   }
@@ -57,6 +62,7 @@ export async function getStudentsWithProgress(deptId = null) {
     .order('name')
 
   if (deptId) q = q.eq('department_id', deptId)
+  if (programLevel) q = q.eq('program_level', programLevel)
 
   const { data: students, error } = await q
   if (error) throw error
