@@ -76,6 +76,7 @@ export async function login(email, password) {
     user_id:       user.id,
     role:          user.role,
     department_id: user.department_id,
+    program_level: user.program_level || 'Both',
     dual_role:     isDualRole,
     dual_roles:    availableRoles,
     user: { id:user.id, name:user.name, title:user.title, email:user.email },
