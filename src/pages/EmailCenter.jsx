@@ -7,7 +7,7 @@ import { EMAIL_TEMPLATES } from '../lib/emailTemplates'
 import { formatDistanceToNow } from 'date-fns'
 
 export default function EmailCenter() {
-  const { effectiveDeptId } = useDept() || {}
+  const { effectiveDeptId, effectiveProgLevel, viewingDept, viewingLevel } = useDept() || {}
   const [students, setStudents] = useState([])
   const [log, setLog] = useState([])
   const [loading, setLoading] = useState(true)
@@ -46,7 +46,7 @@ export default function EmailCenter() {
 
     // Load students and email log
     Promise.all([
-      getStudentsWithProgress(effectiveDeptId).then(setStudents),
+      getStudentsWithProgress(effectiveDeptId, effectiveProgLevel).then(setStudents),
       getEmailLog().then(setLog),
     ]).finally(() => setLoading(false))
   }, [])
