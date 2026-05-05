@@ -16,7 +16,7 @@ const STATUS_LABELS = {
 }
 
 export default function Students() {
-  const { effectiveDeptId, effectiveProgLevel } = useDept() || {}
+  const { effectiveDeptId, effectiveProgLevel, viewingDept, viewingLevel } = useDept() || {}
   const [students, setStudents] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -55,7 +55,7 @@ export default function Students() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [effectiveDeptId, effectiveProgLevel])
+  useEffect(() => { load() }, [effectiveDeptId, effectiveProgLevel, viewingDept, viewingLevel])
 
   const filtered = students.filter(s => {
     const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
