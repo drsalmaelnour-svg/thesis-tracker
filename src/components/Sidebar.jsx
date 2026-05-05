@@ -23,7 +23,7 @@ const ALL_NAV = [
   { to:'/settings',     icon:Settings,        label:'Settings',     key:'settings'    },
 ]
 
-export default function Sidebar({ setViewingDept, viewingDept }) {
+export default function Sidebar({ setViewingDept, viewingDept, setViewingLevel, viewingLevel }) {
   const navigate  = useNavigate()
   const session   = getSession()
   const admin     = isAdmin()
@@ -103,6 +103,26 @@ export default function Sidebar({ setViewingDept, viewingDept }) {
           </NavLink>
         ))}
       </nav>
+
+      {/* Program level filter — admin only */}
+      {admin && (
+        <div className="px-3 pb-2">
+          <p className="text-xs px-2 mb-2 font-semibold uppercase tracking-wider"
+            style={{color:'rgba(255,255,255,0.3)'}}>Program Level</p>
+          <div className="flex gap-1">
+            {['All','Postgraduate','Undergraduate'].map(l => (
+              <button key={l} onClick={()=>setViewingLevel?.(l)}
+                className="flex-1 py-1.5 rounded-xl text-xs font-medium transition-all"
+                style={viewingLevel===l
+                  ? {background:`${accentColor}33`, color:accentColor, border:`1px solid ${accentColor}55`}
+                  : {background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.4)', border:'1px solid rgba(255,255,255,0.1)'}
+                }>
+                {l==='All'?'All':l==='Postgraduate'?'PG':'UG'}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Department list — admin only */}
       {admin && depts.length > 0 && (
