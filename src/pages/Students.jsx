@@ -16,7 +16,7 @@ const STATUS_LABELS = {
 }
 
 export default function Students() {
-  const { effectiveDeptId } = useDept() || {}
+  const { effectiveDeptId, effectiveProgLevel } = useDept() || {}
   const [students, setStudents] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -50,12 +50,12 @@ export default function Students() {
 
   async function load() {
     setLoading(true)
-    try { setStudents(await getStudentsWithProgress(effectiveDeptId)) }
+    try { setStudents(await getStudentsWithProgress(effectiveDeptId, effectiveProgLevel)) }
     catch (e) { console.error(e) }
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [effectiveDeptId])
+  useEffect(() => { load() }, [effectiveDeptId, effectiveProgLevel])
 
   const filtered = students.filter(s => {
     const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
