@@ -4,7 +4,7 @@ import { Calendar, Save, Loader2, CheckCircle2, ChevronDown } from 'lucide-react
 import { getStudentsWithProgress, getCohortDeadlines, upsertCohortDeadline, MILESTONES } from '../lib/supabase'
 
 export default function Deadlines() {
-  const { effectiveDeptId } = useDept() || {}
+  const { effectiveDeptId, effectiveProgLevel, viewingDept, viewingLevel } = useDept() || {}
   const [students, setStudents]         = useState([])
   const [cohortYears, setCohortYears]   = useState([])
   const [activeCohort, setActiveCohort] = useState(null)
@@ -14,7 +14,7 @@ export default function Deadlines() {
   const [saved, setSaved]               = useState(null)
 
   useEffect(() => {
-    getStudentsWithProgress(effectiveDeptId).then(s => {
+    getStudentsWithProgress(effectiveDeptId, effectiveProgLevel).then(s => {
       setStudents(s)
       const years = [...new Set(s.map(x=>x.enrollment_year).filter(Boolean))].sort((a,b)=>b-a)
       setCohortYears(years)
