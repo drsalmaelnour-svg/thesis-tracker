@@ -34,7 +34,7 @@ export default function Sidebar({ setViewingDept, viewingDept, setViewingLevel, 
   const [depts, setDepts] = useState([])
 
   useEffect(() => {
-    if (!admin) return
+    if (!admin && role !== 'dean') return
     import('../lib/supabase').then(({ supabase }) =>
       supabase.from('departments')
         .select('id,name,primary_color,accent_color,bg_color')
@@ -104,8 +104,8 @@ export default function Sidebar({ setViewingDept, viewingDept, setViewingLevel, 
         ))}
       </nav>
 
-      {/* Program level filter — admin only */}
-      {admin && (
+      {/* Program level filter — admin and dean */}
+      {(admin || role === 'dean') && (
         <div className="px-3 pb-2">
           <p className="text-xs px-2 mb-2 font-semibold uppercase tracking-wider"
             style={{color:'rgba(255,255,255,0.3)'}}>Program Level</p>
@@ -124,8 +124,8 @@ export default function Sidebar({ setViewingDept, viewingDept, setViewingLevel, 
         </div>
       )}
 
-      {/* Department list — admin only */}
-      {admin && depts.length > 0 && (
+      {/* Department list — admin and dean */}
+      {(admin || role === 'dean') && depts.length > 0 && (
         <div className="px-3 pb-2 border-t" style={{borderColor:'rgba(255,255,255,0.08)', paddingTop:'12px'}}>
           <p className="text-xs px-2 mb-2 font-semibold uppercase tracking-wider"
             style={{color:'rgba(255,255,255,0.3)'}}>Departments</p>
