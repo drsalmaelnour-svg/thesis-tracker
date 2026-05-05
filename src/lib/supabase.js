@@ -202,17 +202,27 @@ export async function assignStudentGroup(studentId, milestoneId, groupName, resp
 
 // ── Supervisor check-in helpers ───────────────────────────────────────────────
 
-export async function getSupervisorCheckins() {
+export async function getSupervisorCheckins(deptId = null, progLevel = null) {
+  if (!deptId) deptId = await getEffectiveDeptId()
+  if (!progLevel) {
+    try {
+      const { getRole, getSession } = await import('./auth')
+      const role = getRole()
+      if (role !== 'admin' && role !== 'dean') {
+        const s = getSession()
+        if (s?.program_level && s.program_level !== 'Both') progLevel = s.program_level
+      }
+    } catch { /* ignore */ }
+  }
   const { data, error } = await supabase
     .from('supervisor_checkins')
-    .select(`
-      *,
-      supervisors ( id, name, email ),
-      students ( id, name, email, student_id, program )
-    `)
+    .select(`*, supervisors ( id, name, email ), students ( id, name, email, student_id, program, department_id, program_level )`)
     .order('submitted_at', { ascending: false })
   if (error) throw error
-  return data || []
+  let result = data || []
+  if (deptId)    result = result.filter(c => c.students?.department_id === deptId)
+  if (progLevel) result = result.filter(c => c.students?.program_level === progLevel)
+  return result
 }
 
 export async function getCheckinLink(supervisorId, studentId) {
@@ -225,13 +235,27 @@ export async function getCheckinLink(supervisorId, studentId) {
 
 // ── Student check-in helpers ──────────────────────────────────────────────────
 
-export async function getStudentCheckins() {
+export async function getStudentCheckins(deptId = null, progLevel = null) {
+  if (!deptId) deptId = await getEffectiveDeptId()
+  if (!progLevel) {
+    try {
+      const { getRole, getSession } = await import('./auth')
+      const role = getRole()
+      if (role !== 'admin' && role !== 'dean') {
+        const s = getSession()
+        if (s?.program_level && s.program_level !== 'Both') progLevel = s.program_level
+      }
+    } catch { /* ignore */ }
+  }
   const { data, error } = await supabase
     .from('student_checkins')
-    .select(`*, students ( id, name, email, student_id, program, enrollment_year, supervisors(id, name, email) )`)
+    .select(`*, students ( id, name, email, student_id, program, enrollment_year, department_id, program_level, supervisors(id, name, email) )`)
     .order('submitted_at', { ascending: false })
   if (error) throw error
-  return data || []
+  let result = data || []
+  if (deptId)    result = result.filter(c => c.students?.department_id === deptId)
+  if (progLevel) result = result.filter(c => c.students?.program_level === progLevel)
+  return result
 }
 
 export function getStudentCheckinLink(studentToken) {
