@@ -63,7 +63,7 @@ function CohortRing({ rate, label, count }) {
 }
 
 export default function Dashboard() {
-  const { effectiveDeptId } = useDept() || {}
+  const { effectiveDeptId, effectiveProgLevel } = useDept() || {}
   const [students, setStudents]     = useState([])
   const [supCheckins, setSupCheckins] = useState([])
   const [stuCheckins, setStuCheckins] = useState([])
@@ -75,7 +75,7 @@ export default function Dashboard() {
     setLoading(true)
     try {
       const [s, sc, stc, act] = await Promise.all([
-        getStudentsWithProgress(effectiveDeptId),
+        getStudentsWithProgress(effectiveDeptId, effectiveProgLevel),
         getSupervisorCheckins(),
         getStudentCheckins(),
         getRecentActivity(12),
@@ -85,7 +85,7 @@ export default function Dashboard() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [effectiveDeptId])
+  useEffect(() => { load() }, [effectiveDeptId, effectiveProgLevel])
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   const needsAttention = students.filter(s =>
