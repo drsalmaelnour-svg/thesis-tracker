@@ -67,8 +67,8 @@ export default function Checkins() {
     try {
       const [s, sc, stc] = await Promise.all([
         getStudentsWithProgress(effectiveDeptId, effectiveProgLevel),
-        getSupervisorCheckins(),
-        getStudentCheckins(),
+        getSupervisorCheckins(effectiveDeptId, effectiveProgLevel),
+        getStudentCheckins(effectiveDeptId, effectiveProgLevel),
       ])
       setStudents(s); setSupCheckins(sc); setStuCheckins(stc)
     } catch(e) { console.error(e) }
