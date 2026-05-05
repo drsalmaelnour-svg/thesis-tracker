@@ -39,7 +39,7 @@ function StatCard({ label, value, sub, color = 'text-gold-400', icon: Icon }) {
 }
 
 export default function Analytics() {
-  const { effectiveDeptId, effectiveProgLevel } = useDept() || {}
+  const { effectiveDeptId, effectiveProgLevel, viewingDept, viewingLevel } = useDept() || {}
   const [students, setStudents]         = useState([])
   const [stuCheckins, setStuCheckins]   = useState([])
   const [supCheckins, setSupCheckins]   = useState([])
@@ -59,7 +59,7 @@ export default function Analytics() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [effectiveDeptId, effectiveProgLevel])
+  useEffect(() => { load() }, [effectiveDeptId, effectiveProgLevel, viewingDept, viewingLevel])
 
   const cohortYears = [...new Set(students.map(s=>s.enrollment_year).filter(Boolean))].sort((a,b)=>b-a)
   const analytics = getCohortAnalytics ? getCohortAnalytics(cohortFilter, students) : null
