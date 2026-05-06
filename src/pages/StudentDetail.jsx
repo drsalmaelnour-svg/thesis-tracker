@@ -18,7 +18,7 @@ import AddStudentModal from '../components/AddStudentModal'
 import { sendReminder } from '../lib/emailService'
 import { formatDistanceToNow } from 'date-fns'
 
-const TABS = ['Milestones', 'Notes', 'Activity', 'Deadlines']
+const TABS = ['Milestones', 'Notes', 'Activity', 'Deadlines', 'Research Impact']
 
 const ACTIVITY_ICONS = {
   email:     { icon: Mail,          color: 'text-blue-400',    bg: 'bg-blue-500/10'    },
@@ -40,6 +40,9 @@ export default function StudentDetail() {
 
   // Notes
   const [notes, setNotes]           = useState([])
+  const [impact, setImpact]         = useState(null)
+  const [sendingImpact, setSendingImpact] = useState(false)
+  const [impactMsg, setImpactMsg]   = useState('')
   const [newNote, setNewNote]       = useState('')
   const [savingNote, setSavingNote] = useState(false)
 
@@ -65,8 +68,48 @@ export default function StudentDetail() {
       ])
       setNotes(n); setActivityLog(a)
       setOverrideDeadlines(od); setCohortDeadlines(cd)
+
+      // Load research impact
+      try {
+        const { supabase } = await import('../lib/supabase')
+        const { data } = await supabase
+          .from('research_impact').select('*')
+          .eq('student_id', id)
+          .order('submitted_at', { ascending: false })
+          .limit(1).single()
+        setImpact(data)
+      } catch(e) { /* no submission yet */ }
+
     } catch(e) { console.error(e) }
     finally { setLoading(false) }
+  }
+
+  async function sendImpactSurvey() {
+    if (!student) return
+    setSendingImpact(true); setImpactMsg('')
+    try {
+      const { sendResearchImpactEmail } = await import('../lib/emailService')
+      const appUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '')
+      const result = await sendResearchImpactEmail(student, appUrl)
+      if (result.ok) {
+        setImpactMsg('✓ Survey email sent to ' + student.email)
+      } else {
+        setImpactMsg('Email failed — Survey link: ' + appUrl + '/#/research-impact?t=' + student.impact_token)
+      }
+    } catch(e) { setImpactMsg('Error: ' + e.message) }
+    setSendingImpact(false)
+  }
+
+  async function updateImpactStatus(status, notes) {
+    if (!impact) return
+    try {
+      const { supabase } = await import('../lib/supabase')
+      const { data } = await supabase
+        .from('research_impact')
+        .update({ status, coordinator_notes: notes, reviewed_at: new Date().toISOString() })
+        .eq('id', impact.id).select().single()
+      setImpact(data)
+    } catch(e) { console.error(e) }
   }
 
   useEffect(() => { load() }, [id])
@@ -423,6 +466,84 @@ export default function StudentDetail() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* ── RESEARCH IMPACT TAB ── */}
+      {activeTab==='Research Impact' && (
+        <div className="space-y-4">
+          {!impact ? (
+            <div className="card p-5">
+              <h3 className="font-semibold text-slate-100 mb-1">Research Impact Survey</h3>
+              <p className="text-xs text-navy-400 mb-4">
+                Send {student?.name} a link to declare their research impact for KPI 4.4.
+                They will complete the form and upload evidence directly to Google Drive.
+              </p>
+              <button onClick={sendImpactSurvey} disabled={sendingImpact || !student?.email}
+                className="btn-primary text-sm disabled:opacity-50 flex items-center gap-2">
+                {sendingImpact ? <><Loader2 size={14} className="animate-spin"/>Sending…</> : '📧 Send Research Impact Survey'}
+              </button>
+              {impactMsg && <p className="text-xs mt-3 text-emerald-400 break-all">{impactMsg}</p>}
+              {!student?.email && <p className="text-xs mt-2 text-amber-400">⚠ No email address on file.</p>}
+            </div>
+          ) : (
+            <div className="card p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-slate-100">Research Impact Declaration</h3>
+                <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                  impact.status==='approved'   ? 'bg-emerald-500/15 text-emerald-400' :
+                  impact.status==='needs_info' ? 'bg-amber-500/15 text-amber-400' :
+                  'bg-navy-600/50 text-navy-300'
+                }`}>
+                  {impact.status==='approved' ? '✓ Approved' : impact.status==='needs_info' ? '⚠ Needs Info' : '● Pending Review'}
+                </span>
+              </div>
+              <p className="text-xs text-navy-400">Submitted {new Date(impact.submitted_at).toLocaleDateString('en-GB')}</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[['has_publication','Publication'],['has_ip','Intellectual Property'],['has_industry_partner','Industry Partnership'],
+                  ['has_public_events','Public Events'],['has_policy_citation','Policy Citation'],['has_commercialisation','Commercialisation']
+                ].map(([key, label]) => (
+                  <div key={key} className={`px-3 py-2 rounded-xl text-xs font-medium ${
+                    impact[key] ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                    'bg-navy-800/30 text-navy-600 border border-navy-700/20'
+                  }`}>{impact[key] ? '✓' : '✗'} {label}</div>
+                ))}
+                {impact.no_impact && <div className="col-span-2 px-3 py-2 rounded-xl text-xs bg-navy-700/30 text-navy-400 border border-navy-700/20">No impact criteria met</div>}
+              </div>
+              {impact.evidence_files?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-navy-400 uppercase tracking-wider mb-2">Evidence Files</p>
+                  <div className="space-y-2">
+                    {impact.evidence_files.map((f, i) => (
+                      <a key={i} href={f.fileUrl} target="_blank" rel="noreferrer"
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-navy-800/30 border border-navy-700/30 hover:border-gold-500/40 transition-all group">
+                        <span>📄</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-gold-300 truncate">{f.impactType}</p>
+                          <p className="text-xs text-navy-400 truncate">{f.fileName}</p>
+                        </div>
+                        <span className="text-xs text-navy-500 group-hover:text-gold-400">Open ↗</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {impact.status==='pending' && (
+                <div className="flex gap-2 pt-2 border-t border-navy-700/40">
+                  <button onClick={()=>updateImpactStatus('approved','')}
+                    className="flex-1 py-2 rounded-xl text-sm font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25 transition-all">✓ Approve</button>
+                  <button onClick={()=>{const n=prompt('What additional information is needed?');if(n)updateImpactStatus('needs_info',n)}}
+                    className="flex-1 py-2 rounded-xl text-sm font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-all">⚠ Request Info</button>
+                </div>
+              )}
+              <div className="pt-2 border-t border-navy-700/30">
+                <button onClick={sendImpactSurvey} disabled={sendingImpact} className="text-xs text-navy-500 hover:text-navy-300 transition-colors">
+                  {sendingImpact?'Sending…':'↺ Resend survey email'}
+                </button>
+                {impactMsg && <p className="text-xs mt-1 text-emerald-400 break-all">{impactMsg}</p>}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
