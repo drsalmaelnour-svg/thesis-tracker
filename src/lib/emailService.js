@@ -104,3 +104,26 @@ export async function sendBulkReminders(students, milestoneId) {
   }
   return results
 }
+
+// ── Research Impact Survey Email ─────────────────────────────────────────────
+export async function sendResearchImpactEmail(student, appUrl) {
+  init()
+  if (!PUBLIC_KEY || !SERVICE_ID || !STUDENT_TPL) {
+    console.warn('EmailJS not configured')
+    return { ok: false, message: 'EmailJS not configured' }
+  }
+  try {
+    const surveyLink = `${appUrl}/#/research-impact?t=${student.impact_token}`
+    await emailjs.send(SERVICE_ID, STUDENT_TPL, {
+      to_email:   student.email,
+      to_name:    student.name,
+      subject:    'Research Impact Declaration — Action Required',
+      message:    `Dear ${student.name},\n\nAs part of Gulf Medical University's research outcome reporting, we kindly ask you to complete a short Research Impact Declaration for your thesis:\n\n"${student.thesis_title || 'Your Thesis'}"\n\nThis takes approximately 5 minutes. Please click the link below to complete it:\n\n${surveyLink}\n\nIf your research has resulted in publications, presentations, industry collaborations, or other impacts, you will be asked to upload supporting evidence directly to the university's Google Drive.\n\nThank you for your contribution.\n\nBest regards,\nDr. Salma Elnour\nThesis Coordinator\nGulf Medical University`,
+      response_link: surveyLink,
+      milestone:  'Research Impact Survey',
+    })
+    return { ok: true }
+  } catch(e) {
+    return { ok: false, message: e.text || e.message }
+  }
+}
