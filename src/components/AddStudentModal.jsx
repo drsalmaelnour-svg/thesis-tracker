@@ -6,16 +6,18 @@ import { getSupervisors, MILESTONES } from '../lib/supabase'
 export default function AddStudentModal({ onClose, onSuccess, student: existing }) {
   const isEdit = !!existing
   const [supervisors, setSupervisors] = useState([])
+  const [groups,      setGroups]      = useState([])
   const [form, setForm] = useState({
-    name:            existing?.name            || '',
-    email:           existing?.email           || '',
-    student_id:      existing?.student_id      || '',
-    program:         existing?.program         || '',
-    thesis_title:    existing?.thesis_title    || '',
-    supervisor_id:   existing?.supervisor_id   || '',
-    enrollment_year:  existing?.enrollment_year  || new Date().getFullYear(),
-    program_level:    existing?.program_level    || 'Postgraduate',
-    research_area:   existing?.research_area   || '',
+    name:              existing?.name              || '',
+    email:             existing?.email             || '',
+    student_id:        existing?.student_id        || '',
+    program:           existing?.program           || '',
+    thesis_title:      existing?.thesis_title      || '',
+    supervisor_id:     existing?.supervisor_id     || '',
+    enrollment_year:   existing?.enrollment_year   || new Date().getFullYear(),
+    program_level:     existing?.program_level     || 'Postgraduate',
+    research_area:     existing?.research_area     || '',
+    research_group_id: existing?.research_group_id || '',
   })
   const [saving, setSaving] = useState(false)
   const [specOther, setSpecOther] = useState('')
@@ -27,6 +29,12 @@ export default function AddStudentModal({ onClose, onSuccess, student: existing 
     getSupervisors().then(sups => {
       setSupervisors(sups)
     }).catch(console.error)
+
+    // Load UG groups for group selector
+    import('../lib/supabase').then(({ supabase }) => {
+      supabase.from('research_groups').select('id,name,academic_year').eq('program_level','Undergraduate').order('academic_year',{ascending:false}).order('name')
+        .then(({ data }) => setGroups(data || []))
+    })
 
     // Load all specializations from both internal and external examiners
     async function loadSpecs() {
@@ -71,6 +79,7 @@ export default function AddStudentModal({ onClose, onSuccess, student: existing 
             enrollment_year: form.enrollment_year,
             program_level:   form.program_level || 'Postgraduate',
             research_area:   form.research_area || null,
+            research_group_id: form.research_group_id || null,
             updated_at:      new Date().toISOString(),
           })
           .eq('id', existing.id)
@@ -211,6 +220,20 @@ export default function AddStudentModal({ onClose, onSuccess, student: existing 
                 onChange={e => { setSpecOther(e.target.value); set('research_area', e.target.value) }}/>
             )}
           </div>
+
+          {/* Group assignment — only shown for UG or if groups exist */}
+          {(form.program_level === 'Undergraduate' || groups.length > 0) && (
+            <div className="field-group">
+              <label className="label">Research Group <span className="text-navy-600 font-normal">(Undergraduate)</span></label>
+              <select className="input" value={form.research_group_id}
+                onChange={e => set('research_group_id', e.target.value)}>
+                <option value="">— No group / Postgraduate —</option>
+                {groups.map(g => (
+                  <option key={g.id} value={g.id}>{g.name} {g.academic_year ? `(${g.academic_year})` : ''}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {error && (
             <div className="p-3 rounded-xl text-sm border bg-red-900/20 border-red-700/40 text-red-300">
