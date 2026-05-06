@@ -4,6 +4,7 @@ import { isLoggedIn, isAdmin, getSession, getRole } from './lib/auth'
 import Login from './pages/Login'
 import ForgotPassword from './pages/ForgotPassword'
 import ResearchImpact from './pages/ResearchImpact'
+import Groups from './pages/Groups'
 import SupervisorResearchImpact from './pages/SupervisorResearchImpact'
 import ResetPassword from './pages/ResetPassword'
 import { ThemeProvider, DEPT_THEMES } from './context/ThemeContext'
@@ -66,6 +67,7 @@ export default function App() {
       <Routes>
         <Route path="/login"           element={<Login />} />
         <Route path="/forgot-password"  element={<ForgotPassword />} />
+        <Route path="/groups" element={<Layout setViewingDept={setViewingDept} viewingDept={viewingDept} setViewingLevel={setViewingLevel} viewingLevel={viewingLevel}><Groups /></Layout>} />
         <Route path="/research-impact"              element={<ResearchImpact />} />
         <Route path="/supervisor-research-impact"  element={<SupervisorResearchImpact />} />
         <Route path="/reset-password"  element={<ResetPassword />} />
