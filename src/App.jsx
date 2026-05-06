@@ -4,6 +4,7 @@ import { isLoggedIn, isAdmin, getSession, getRole } from './lib/auth'
 import Login from './pages/Login'
 import ForgotPassword from './pages/ForgotPassword'
 import ResearchImpact from './pages/ResearchImpact'
+import SupervisorResearchImpact from './pages/SupervisorResearchImpact'
 import ResetPassword from './pages/ResetPassword'
 import { ThemeProvider, DEPT_THEMES } from './context/ThemeContext'
 import { RoleProvider } from './context/RoleContext'
@@ -65,7 +66,8 @@ export default function App() {
       <Routes>
         <Route path="/login"           element={<Login />} />
         <Route path="/forgot-password"  element={<ForgotPassword />} />
-        <Route path="/research-impact"   element={<ResearchImpact />} />
+        <Route path="/research-impact"              element={<ResearchImpact />} />
+        <Route path="/supervisor-research-impact"  element={<SupervisorResearchImpact />} />
         <Route path="/reset-password"  element={<ResetPassword />} />
         {/* Public response route — no sidebar */}
         <Route path="/respond" element={<Respond />} />
