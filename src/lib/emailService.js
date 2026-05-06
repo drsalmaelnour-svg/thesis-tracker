@@ -118,9 +118,32 @@ export async function sendResearchImpactEmail(student, appUrl) {
       to_email:   student.email,
       to_name:    student.name,
       subject:    'Research Impact Declaration — Action Required',
-      message:    `Dear ${student.name},\n\nAs part of Gulf Medical University's research outcome reporting, we kindly ask you to complete a short Research Impact Declaration for your thesis:\n\n"${student.thesis_title || 'Your Thesis'}"\n\nThis takes approximately 5 minutes. Please click the link below to complete it:\n\n${surveyLink}\n\nIf your research has resulted in publications, presentations, industry collaborations, or other impacts, you will be asked to upload supporting evidence directly to the university's Google Drive.\n\nThank you for your contribution.\n\nBest regards,\nDr. Salma Elnour\nThesis Coordinator\nGulf Medical University`,
+      message:    `As part of Gulf Medical University's research outcome reporting, we kindly ask you to complete a short Research Impact Declaration for your thesis:\n\n"${student.thesis_title || 'Your Thesis'}"\n\nThis takes approximately 5 minutes. If your research has resulted in publications, presentations, industry collaborations, or other impacts, you will be asked to upload supporting evidence.`,
       response_link: surveyLink,
       milestone:  'Research Impact Survey',
+    })
+    return { ok: true }
+  } catch(e) {
+    return { ok: false, message: e.text || e.message }
+  }
+}
+
+// ── Supervisor Research Impact Email ─────────────────────────────────────────
+export async function sendSupervisorImpactEmail(student, supervisor, appUrl) {
+  init()
+  if (!PUBLIC_KEY || !SERVICE_ID || !SUPERVISOR_TPL) {
+    return { ok: false, message: 'EmailJS not configured' }
+  }
+  try {
+    const surveyLink = `${appUrl}/#/supervisor-research-impact?t=${student.supervisor_impact_token}`
+    await emailjs.send(SERVICE_ID, SUPERVISOR_TPL, {
+      to_email:      supervisor.email,
+      to_name:       supervisor.name,
+      student_name:  student.name,
+      subject:       `Research Impact Confirmation Request — ${student.name}`,
+      message:       `We kindly ask you to confirm the research impact for the following student thesis under your supervision:\n\n"${student.thesis_title || 'Student Thesis'}"\n\nAs the supervising academic, your confirmation is required as part of Gulf Medical University's research outcome reporting (KPI 4.4). You will be able to review what the student has already declared and add any additional impact evidence.\n\nThis takes approximately 5 minutes.`,
+      response_link: surveyLink,
+      milestone:     'Research Impact Confirmation',
     })
     return { ok: true }
   } catch(e) {
