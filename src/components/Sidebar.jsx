@@ -12,6 +12,7 @@ import { useRole } from '../context/RoleContext'
 const ALL_NAV = [
   { to:'/',             icon:LayoutDashboard, label:'Dashboard',    key:'dashboard'   },
   { to:'/students',     icon:Users,           label:'Students',     key:'students'    },
+  { to:'/groups',       icon:Users2,          label:'Groups',       key:'groups'      },
   { to:'/checkins',     icon:ClipboardList,   label:'Check-ins',    key:'checkins'    },
   { to:'/emails',       icon:Mail,            label:'Email Center', key:'emailCenter' },
   { to:'/assessments',  icon:Award,           label:'Assessments',  key:'assessments' },
@@ -55,8 +56,9 @@ export default function Sidebar({ setViewingDept, viewingDept, setViewingLevel, 
   function handleLogout() { logout(); navigate('/login') }
 
   const navItems = ALL_NAV.filter(item => {
-    if (!can?.nav) return true
-    return can.nav[item.key] !== false
+    if (!can?.nav || Object.keys(can.nav).length === 0) return true
+    const permission = can.nav[item.key]
+    return permission === undefined ? true : permission !== false
   })
 
   const sidebarBg     = theme?.primary || '#1e3a5f'
