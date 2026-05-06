@@ -43,6 +43,7 @@ export function RoleProvider({ children, viewingDept }) {
       assessments: true,
       reports:     true,
       analytics:   admin || coord || dean,
+      groups:      admin || coord || hod || dean,
       calendar:    admin || coord,
       deadlines:   admin || coord,
       settings:    admin || coord,
