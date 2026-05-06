@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-d
 import { isLoggedIn, isAdmin, getSession, getRole } from './lib/auth'
 import Login from './pages/Login'
 import ForgotPassword from './pages/ForgotPassword'
+import ResearchImpact from './pages/ResearchImpact'
 import ResetPassword from './pages/ResetPassword'
 import { ThemeProvider, DEPT_THEMES } from './context/ThemeContext'
 import { RoleProvider } from './context/RoleContext'
@@ -63,7 +64,8 @@ export default function App() {
     <RoleProvider viewingDept={viewingDept}>
       <Routes>
         <Route path="/login"           element={<Login />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/forgot-password"  element={<ForgotPassword />} />
+        <Route path="/research-impact"   element={<ResearchImpact />} />
         <Route path="/reset-password"  element={<ResetPassword />} />
         {/* Public response route — no sidebar */}
         <Route path="/respond" element={<Respond />} />
