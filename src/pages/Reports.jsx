@@ -984,8 +984,10 @@ export default function Reports() {
       })
       const rollingAvg = Math.round(yearStats.reduce((s,y)=>s+y.pct,0)/yearStats.length)
 
-      const { jsPDF }    = await import('jspdf')
-      const { autoTable } = await import('jspdf-autotable')
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js')
+      const jsPDF = window.jspdf?.jsPDF || window.jsPDF
+      if (!jsPDF) throw new Error('PDF library failed to load')
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
       const pageW = doc.internal.pageSize.getWidth()
       const pageH = doc.internal.pageSize.getHeight()
@@ -1055,7 +1057,7 @@ export default function Reports() {
         ]
       })
 
-      autoTable(doc, {
+      doc.autoTable({
         startY: 93,
         head: [['#', 'Student', 'ID', 'Supervisor', 'Thesis Title', 'Year', 'Impact Type(s)', 'Sup.Conf', 'ORCID']],
         body: rows,
@@ -1126,6 +1128,99 @@ export default function Reports() {
 
       doc.save(`KPI-4.4-Research-Participation-${currentYear}.pdf`)
     } catch(e) { console.error('KPI 4.4 report error:', e) }
+  }
+
+  async function generateKPI44Excel() {
+    try {
+      const { supabase } = await import('../lib/supabase')
+      let q = supabase.from('research_impact')
+        .select('*, students(id,name,email,student_id,enrollment_year,thesis_title,program_level,supervisors(name,email),student_milestones(milestone_id,status))')
+        .eq('status','approved').order('academic_year', { ascending: false })
+      if (effectiveDeptId) q = q.eq('department_id', effectiveDeptId)
+      const { data: impacts } = await q
+      const allStudents = await getStudentsWithProgress(effectiveDeptId, effectiveProgLevel)
+
+      const currentYear = (() => { const n=new Date(); const y=n.getFullYear(); return n.getMonth()+1>=9?`${y}-${y+1}`:`${y-1}-${y}` })()
+      const years = [currentYear,
+        (() => { const [a,b]=currentYear.split('-').map(Number); return `${a-1}-${b-1}` })(),
+        (() => { const [a,b]=currentYear.split('-').map(Number); return `${a-2}-${b-2}` })(),
+      ]
+      const yearStats = years.map(yr => {
+        const qualifying = (impacts||[]).filter(i => i.academic_year === yr).length
+        const total = allStudents.length
+        return { year: yr, qualifying, total, pct: total ? Math.round(qualifying/total*100) : 0 }
+      })
+      const rollingAvg = Math.round(yearStats.reduce((s,y)=>s+y.pct,0)/yearStats.length)
+
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js')
+      const XLSX = window.XLSX
+      const wb = XLSX.utils.book_new()
+
+      // Summary sheet
+      const summaryData = [
+        ['KPI 4.4 — Student Participation Rate in Research'],
+        ['Department', session?.department?.name || 'College of Health Sciences'],
+        ['Report Date', new Date().toLocaleDateString('en-GB')],
+        [],
+        ['3-Year Rolling Average', `${rollingAvg}%`],
+        [],
+        ['Academic Year', 'Qualifying Students', 'Total Students', 'Rate (%)'],
+        ...yearStats.map(s => [s.year, s.qualifying, s.total, s.pct + '%']),
+      ]
+      const ws1 = XLSX.utils.aoa_to_sheet(summaryData)
+      ws1['!cols'] = [{wch:30},{wch:25},{wch:20},{wch:15}]
+      XLSX.utils.book_append_sheet(wb, ws1, 'Summary')
+
+      // Student detail sheet
+      const headers = ['#','Student Name','Student ID','Supervisor','Thesis Title','Academic Year','Publication','IP','Industry','Events','Policy','Revenue','Supervisor Confirmed','ORCID','Evidence Files']
+      const rows = (impacts||[]).map((item,i) => {
+        const s = item.students
+        const orcid = s?.student_milestones?.find(m=>m.milestone_id==='orcid')?.status === 'completed'
+        const allEvidence = [...(item.evidence_files||[]),...(item.supervisor_evidence_files||[])]
+        return [
+          i+1,
+          s?.name||'—', s?.student_id||'—', s?.supervisors?.name||'—',
+          item.thesis_title||s?.thesis_title||'—',
+          item.academic_year||'—',
+          item.has_publication||item.supervisor_has_publication?'Yes':'',
+          item.has_ip||item.supervisor_has_ip?'Yes':'',
+          item.has_industry_partner||item.supervisor_has_industry_partner?'Yes':'',
+          item.has_public_events?'Yes':'',
+          item.has_policy_citation?'Yes':'',
+          item.has_commercialisation?'Yes':'',
+          item.supervisor_confirmed?'Yes':'',
+          orcid?'Yes':'',
+          allEvidence.map(e=>e.fileUrl).join(' | '),
+        ]
+      })
+      const ws2 = XLSX.utils.aoa_to_sheet([headers, ...rows])
+      ws2['!cols'] = [{wch:5},{wch:25},{wch:15},{wch:25},{wch:40},{wch:12},{wch:12},{wch:8},{wch:12},{wch:10},{wch:10},{wch:10},{wch:18},{wch:10},{wch:60}]
+      XLSX.utils.book_append_sheet(wb, ws2, 'Student Detail')
+
+      XLSX.writeFile(wb, `KPI-4.4-Research-Participation-${currentYear}.xlsx`)
+    } catch(e) { console.error('KPI 4.4 Excel error:', e) }
+  }
+
+  async function emailKPI44Report(emailTo) {
+    setKpi44Sending(true); setKpi44Msg('')
+    try {
+      const { sendStudentEmail } = await import('../lib/emailService')
+      const currentYear = (() => { const n=new Date(); const y=n.getFullYear(); return n.getMonth()+1>=9?`${y}-${y+1}`:`${y-1}-${y}` })()
+      const appUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '')
+      const result = await sendStudentEmail({
+        student: { name: emailTo.split('@')[0], email: emailTo, token: '' },
+        milestoneId: null,
+        subject: `KPI 4.4 Report — Student Research Participation ${currentYear}`,
+        message: `Please find below the KPI 4.4 — Student Participation Rate in Research report for ${currentYear}.\n\nTo download the full report with evidence links, please visit:\n${appUrl}/#/reports\n\nThis report has been generated from the GMU Thesis Coordination System.`,
+      })
+      if (result?.ok !== false) {
+        setKpi44Msg('✓ Email sent to ' + emailTo)
+        setKpi44Email('')
+      } else {
+        setKpi44Msg('Failed: ' + (result?.message || 'Unknown error'))
+      }
+    } catch(e) { setKpi44Msg('Error: ' + e.message) }
+    setKpi44Sending(false)
   }
 
   return (
