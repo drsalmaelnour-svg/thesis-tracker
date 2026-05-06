@@ -12,7 +12,7 @@ import { useRole } from '../context/RoleContext'
 const ALL_NAV = [
   { to:'/',             icon:LayoutDashboard, label:'Dashboard',    key:'dashboard'   },
   { to:'/students',     icon:Users,           label:'Students',     key:'students'    },
-  { to:'/groups',       icon:Users2,          label:'Groups',       key:'groups'      },
+  { to:'/groups',       icon:Users,           label:'Groups',       key:'groups'      },
   { to:'/checkins',     icon:ClipboardList,   label:'Check-ins',    key:'checkins'    },
   { to:'/emails',       icon:Mail,            label:'Email Center', key:'emailCenter' },
   { to:'/assessments',  icon:Award,           label:'Assessments',  key:'assessments' },
