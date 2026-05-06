@@ -45,6 +45,7 @@ export default function Analytics() {
   const [supCheckins, setSupCheckins]   = useState([])
   const [loading, setLoading]           = useState(true)
   const [cohortFilter, setCohortFilter] = useState('all')
+  const [impactData, setImpactData]     = useState([])
 
   async function load() {
     setLoading(true)
@@ -55,6 +56,13 @@ export default function Analytics() {
         getSupervisorCheckins(),
       ])
       setStudents(s); setStuCheckins(stc); setSupCheckins(suc)
+
+      // Load research impact approvals
+      const { supabase } = await import('../lib/supabase')
+      let q = supabase.from('research_impact').select('student_id, status, academic_year, has_publication, has_ip, has_industry_partner, has_public_events, has_policy_citation, has_commercialisation, no_impact')
+      if (effectiveDeptId) q = q.eq('department_id', effectiveDeptId)
+      const { data: impacts } = await q
+      setImpactData(impacts || [])
     } catch(e) { console.error(e) }
     finally { setLoading(false) }
   }
@@ -191,6 +199,88 @@ export default function Analytics() {
               <p className="text-xs text-navy-400 mt-1">{bottleneck.rate}% · {bottleneck.completed}/{total} students</p>
             </div>
           )}
+
+          {/* KPI 4.4 — Research Participation */}
+          {(() => {
+            const currentYear = (() => { const n=new Date(); const y=n.getFullYear(); return n.getMonth()+1>=9?`${y}-${y+1}`:`${y-1}-${y}` })()
+            const years = [currentYear,
+              (() => { const [a,b]=currentYear.split('-').map(Number); return `${a-1}-${b-1}` })(),
+              (() => { const [a,b]=currentYear.split('-').map(Number); return `${a-2}-${b-2}` })(),
+            ]
+            const studentIds = new Set(students.map(s=>s.id))
+            const stats = years.map(yr => {
+              const yearImpacts = impactData.filter(i => i.academic_year===yr && studentIds.has(i.student_id))
+              const approved    = yearImpacts.filter(i => i.status==='approved').length
+              const denom       = students.filter(s => {
+                const ey = s.enrollment_year
+                if (!ey) return false
+                const [ya] = yr.split('-').map(Number)
+                return ey <= ya
+              }).length || students.length
+              return { year: yr, approved, total: denom, pct: denom ? Math.round(approved/denom*100) : 0 }
+            })
+            const rollingAvg = Math.round(stats.reduce((sum,s)=>sum+s.pct,0)/stats.length)
+            const impactTypes = [
+              ['has_publication','Publications'],
+              ['has_industry_partner','Industry'],
+              ['has_public_events','Events'],
+              ['has_ip','IP'],
+              ['has_policy_citation','Policy'],
+              ['has_commercialisation','Revenue'],
+            ]
+            const approvedImpacts = impactData.filter(i=>i.status==='approved' && studentIds.has(i.student_id))
+
+            return (
+              <div className="card p-5 space-y-4">
+                <h2 className="font-display font-semibold text-slate-100 text-sm flex items-center gap-2">
+                  🔬 KPI 4.4 — Student Participation in Research
+                </h2>
+
+                {/* 3-year rolling average */}
+                <div className="flex items-center gap-4 p-3 rounded-xl bg-navy-800/30">
+                  <div>
+                    <p className="text-2xl font-bold text-gold-400">{rollingAvg}%</p>
+                    <p className="text-xs text-navy-400">3-Year Rolling Average</p>
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    {stats.map(s => (
+                      <div key={s.year}>
+                        <div className="flex justify-between text-xs mb-0.5">
+                          <span className="text-navy-400">{s.year}</span>
+                          <span className="text-slate-300">{s.approved}/{s.total} · {s.pct}%</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-navy-700">
+                          <div className="h-1.5 rounded-full bg-gold-400 transition-all" style={{width:`${s.pct}%`}}/>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Impact type breakdown */}
+                {approvedImpacts.length > 0 && (
+                  <div>
+                    <p className="text-xs text-navy-400 uppercase tracking-wider font-semibold mb-2">By Impact Type</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {impactTypes.map(([key, label]) => {
+                        const count = approvedImpacts.filter(i=>i[key]).length
+                        return (
+                          <div key={key} className="px-3 py-2 rounded-xl bg-navy-800/30 text-center">
+                            <p className="text-lg font-bold text-slate-200">{count}</p>
+                            <p className="text-xs text-navy-400">{label}</p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {impactData.length === 0 && (
+                  <p className="text-xs text-navy-500 text-center py-2">No research impact submissions yet. Send surveys from student profiles.</p>
+                )}
+              </div>
+            )
+          })()}
 
         </div>
       </div>
