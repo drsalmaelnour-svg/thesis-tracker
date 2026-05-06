@@ -68,6 +68,7 @@ export default function Dashboard() {
   const [supCheckins, setSupCheckins] = useState([])
   const [stuCheckins, setStuCheckins] = useState([])
   const [activity, setActivity]     = useState([])
+  const [impactData, setImpactData]   = useState([])
   const [loading, setLoading]       = useState(true)
   const [emailStudent, setEmailStudent] = useState(null)
 
@@ -81,6 +82,15 @@ export default function Dashboard() {
         getRecentActivity(12),
       ])
       setStudents(s); setSupCheckins(sc); setStuCheckins(stc); setActivity(act)
+
+      // Load KPI 4.4 impact data
+      try {
+        const { supabase } = await import('../lib/supabase')
+        let q = supabase.from('research_impact').select('id,student_id,status,submitted_at,supervisor_confirmed,has_publication,has_ip,has_industry_partner,has_public_events,has_policy_citation,has_commercialisation,no_impact,academic_year')
+        if (effectiveDeptId) q = q.eq('department_id', effectiveDeptId)
+        const { data: impacts } = await q.order('submitted_at', { ascending: false })
+        setImpactData(impacts || [])
+      } catch(e) { console.error(e) }
     } catch(e) { console.error(e) }
     finally { setLoading(false) }
   }
