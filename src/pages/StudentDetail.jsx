@@ -499,6 +499,12 @@ export default function StudentDetail() {
                 </span>
               </div>
               <p className="text-xs text-navy-400">Submitted {new Date(impact.submitted_at).toLocaleDateString('en-GB')}</p>
+              {impact.supervisor_submitted_at && (
+                <p className="text-xs text-emerald-400">✓ Supervisor confirmed {new Date(impact.supervisor_submitted_at).toLocaleDateString('en-GB')}</p>
+              )}
+              {!impact.supervisor_submitted_at && student?.supervisors?.email && (
+                <p className="text-xs text-amber-400">⏳ Awaiting supervisor confirmation</p>
+              )}
               <div className="grid grid-cols-2 gap-2">
                 {[['has_publication','Publication'],['has_ip','Intellectual Property'],['has_industry_partner','Industry Partnership'],
                   ['has_public_events','Public Events'],['has_policy_citation','Policy Citation'],['has_commercialisation','Commercialisation']
@@ -538,8 +544,22 @@ export default function StudentDetail() {
               )}
               <div className="pt-2 border-t border-navy-700/30">
                 <button onClick={sendImpactSurvey} disabled={sendingImpact} className="text-xs text-navy-500 hover:text-navy-300 transition-colors">
-                  {sendingImpact?'Sending…':'↺ Resend survey email'}
+                  {sendingImpact?'Sending…':'↺ Resend survey to student'}
                 </button>
+                {student?.supervisors?.email && (
+                  <button onClick={async () => {
+                    setSendingImpact(true); setImpactMsg('')
+                    try {
+                      const { sendSupervisorImpactEmail } = await import('../lib/emailService')
+                      const appUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '')
+                      const result = await sendSupervisorImpactEmail(student, student.supervisors, appUrl)
+                      setImpactMsg(result.ok ? '✓ Confirmation request sent to supervisor' : 'Failed: ' + result.message)
+                    } catch(e) { setImpactMsg('Error: ' + e.message) }
+                    setSendingImpact(false)
+                  }} disabled={sendingImpact} className="text-xs text-navy-500 hover:text-navy-300 transition-colors ml-4">
+                    📧 Send to Supervisor
+                  </button>
+                )}
                 {impactMsg && <p className="text-xs mt-1 text-emerald-400 break-all">{impactMsg}</p>}
               </div>
             </div>
