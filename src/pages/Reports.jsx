@@ -952,279 +952,541 @@ export default function Reports() {
   const headers = rows.length ? Object.keys(rows[0]) : []
 
 
-  // ── KPI 4.4 Report ───────────────────────────────────────────────────────────
-  async function generateKPI44Report() {
+  // ── KPI 4.4 Helpers ─────────────────────────────────────────────────────────
+  function getCurrentYear() {
+    const n=new Date(); const y=n.getFullYear()
+    return n.getMonth()+1>=9?`${y}-${y+1}`:`${y-1}-${y}`
+  }
+
+  function getYears(currentYear) {
+    const [a,b] = currentYear.split('-').map(Number)
+    return [currentYear, `${a-1}-${b-1}`, `${a-2}-${b-2}`]
+  }
+
+  async function loadImpactData(programLevel) {
+    const { supabase } = await import('../lib/supabase')
+    let q = supabase.from('research_impact')
+      .select(`*, students(id,name,email,student_id,enrollment_year,thesis_title,program_level,research_group_id,
+        supervisors(id,name,email,designation),
+        student_milestones(milestone_id,status),
+        research_groups(id,name,thesis_title,irb_number,students(id,name,student_id))
+      )`)
+      .eq('status','approved')
+      .order('academic_year',{ascending:false})
+    if (effectiveDeptId) q = q.eq('department_id', effectiveDeptId)
+    if (programLevel) q = q.eq('program_level', programLevel)
+    const { data } = await q
+    return data || []
+  }
+
+  function impactTypes(item) {
+    const t=[]
+    if(item.has_publication||item.supervisor_has_publication) t.push('Publication')
+    if(item.has_ip||item.supervisor_has_ip) t.push('IP')
+    if(item.has_industry_partner||item.supervisor_has_industry_partner) t.push('Industry')
+    if(item.has_public_events) t.push('Events')
+    if(item.has_policy_citation) t.push('Policy')
+    if(item.has_commercialisation) t.push('Revenue')
+    return t.join(', ') || 'Other'
+  }
+
+  function calcYearStats(impacts, allStudents, years, programLevel) {
+    return years.map(yr => {
+      const qualifying = impacts.filter(i=>i.academic_year===yr).length
+      const total = allStudents.filter(s=>s.program_level===programLevel).length || allStudents.length
+      return { year:yr, qualifying, total, pct: total?Math.round(qualifying/total*100):0 }
+    })
+  }
+
+  // ── KPI 4.4 PG PDF ───────────────────────────────────────────────────────────
+  async function generateKPI44PGReport() {
     try {
-      const { supabase } = await import('../lib/supabase')
-
-      // Load approved impact submissions
-      let q = supabase.from('research_impact')
-        .select(`*, students(id, name, email, student_id, enrollment_year, thesis_title, program_level, orcid,
-          supervisors(id, name, email, designation, institution),
-          student_milestones(milestone_id, status)
-        )`)
-        .eq('status', 'approved')
-        .order('academic_year', { ascending: false })
-      if (effectiveDeptId) q = q.eq('department_id', effectiveDeptId)
-      const { data: impacts } = await q
-
-      // Load all students for denominator
-      const allStudents = await getStudentsWithProgress(effectiveDeptId, effectiveProgLevel)
-
-      // Calculate per-year stats
-      const currentYear = (() => { const n=new Date(); const y=n.getFullYear(); return n.getMonth()+1>=9?`${y}-${y+1}`:`${y-1}-${y}` })()
-      const years = [currentYear,
-        (() => { const [a,b]=currentYear.split('-').map(Number); return `${a-1}-${b-1}` })(),
-        (() => { const [a,b]=currentYear.split('-').map(Number); return `${a-2}-${b-2}` })(),
-      ]
-      const yearStats = years.map(yr => {
-        const qualifying = (impacts||[]).filter(i => i.academic_year === yr).length
-        const total      = allStudents.filter(s => {
-          const [ya] = yr.split('-').map(Number)
-          return s.enrollment_year && s.enrollment_year <= ya
-        }).length || allStudents.length
-        return { year: yr, qualifying, total, pct: total ? Math.round(qualifying/total*100) : 0 }
-      })
-      const rollingAvg = Math.round(yearStats.reduce((s,y)=>s+y.pct,0)/yearStats.length)
-
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js')
       const jsPDF = window.jspdf?.jsPDF || window.jsPDF
       if (!jsPDF) throw new Error('PDF library failed to load')
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+
+      const impacts     = await loadImpactData('Postgraduate')
+      const allStudents = await getStudentsWithProgress(effectiveDeptId, 'Postgraduate')
+      const currentYear = getCurrentYear()
+      const years       = getYears(currentYear)
+      const yearStats   = calcYearStats(impacts, allStudents, years, 'Postgraduate')
+      const rollingAvg  = Math.round(yearStats.reduce((s,y)=>s+y.pct,0)/yearStats.length)
+      const sigs        = getSignatures()
+      const dept        = session?.department?.name || 'College of Health Sciences'
+
+      const confidenceBand = rollingAvg >= 15 ? 'VERY HIGH' : rollingAvg >= 12 ? 'HIGH' :
+                             rollingAvg >= 6  ? 'MEDIUM'    : rollingAvg >= 3  ? 'LOW' : 'VERY LOW'
+      const bandColor = rollingAvg >= 12 ? [16,185,129] : rollingAvg >= 6 ? [245,158,11] : [239,68,68]
+
+      const doc   = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'})
       const pageW = doc.internal.pageSize.getWidth()
       const pageH = doc.internal.pageSize.getHeight()
+      let curY = 0
 
-      // ── Header ──
-      doc.setFillColor(...GMU_NAVY); doc.rect(0, 0, pageW, 28, 'F')
-      doc.setFillColor(...GMU_GOLD); doc.rect(0, 26, pageW, 2, 'F')
+      // ── Cover header ──
+      doc.setFillColor(...GMU_NAVY); doc.rect(0,0,pageW,32,'F')
+      doc.setFillColor(...GMU_GOLD); doc.rect(0,30,pageW,2.5,'F')
       doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(255,255,255)
-      doc.text('KPI 4.4 — Student Participation Rate in Research', pageW/2, 12, { align:'center' })
-      doc.setFont('helvetica','normal'); doc.setFontSize(9)
-      doc.text('OBEF Research Outcomes · Pillar 4 · Programmatic Weight: 5%', pageW/2, 20, { align:'center' })
+      doc.text('KPI 4.4 — Postgraduate Student Research Participation', pageW/2, 13, {align:'center'})
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(212,168,67)
+      doc.text('OBEF Research Outcomes · Pillar 4 · Programmatic Weight: 5%', pageW/2, 22, {align:'center'})
 
-      // ── Report meta ──
-      doc.setTextColor(...GMU_NAVY); doc.setFontSize(9)
-      const sigs = getSignatures()
-      const dept = session?.department?.name || 'College of Health Sciences'
-      doc.text(`Department: ${dept}`, 14, 36)
-      doc.text(`Report Date: ${new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'})}`, 14, 41)
-      doc.text(`Program Level: ${effectiveProgLevel || 'All'}`, 14, 46)
+      // ── Meta row ──
+      curY = 40
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GMU_NAVY)
+      doc.text(`Institution: Gulf Medical University`, 14, curY)
+      doc.text(`Department: ${dept}`, 14, curY+5)
+      doc.text(`Program Level: Postgraduate`, 14, curY+10)
+      doc.text(`Reporting Period: ${currentYear}`, pageW/2, curY, {align:'left'})
+      doc.text(`Report Date: ${new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'})}`, pageW/2, curY+5)
 
-      // ── Rolling average summary ──
-      doc.setFillColor(245, 247, 250); doc.roundedRect(14, 52, pageW-28, 28, 3, 3, 'F')
-      doc.setDrawColor(...GMU_GOLD); doc.setLineWidth(0.5); doc.roundedRect(14, 52, pageW-28, 28, 3, 3, 'S')
-      doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.setTextColor(...GMU_NAVY)
-      doc.text(`${rollingAvg}%`, 30, 67)
-      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(100,100,100)
-      doc.text('3-Year Rolling Average', 30, 73)
+      // ── KPI Summary box ──
+      curY = 60
+      doc.setFillColor(245,247,250); doc.roundedRect(14,curY,pageW-28,38,3,3,'F')
+      doc.setDrawColor(...GMU_GOLD); doc.setLineWidth(0.6); doc.roundedRect(14,curY,pageW-28,38,3,3,'S')
+
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...GMU_NAVY)
+      doc.text('KPI 4.4 Summary', 20, curY+8)
+
+      // Rolling avg big number
+      doc.setFontSize(28); doc.setTextColor(...GMU_NAVY)
+      doc.text(`${rollingAvg}%`, 20, curY+28)
+      doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(100,100,100)
+      doc.text('3-Year Rolling Average', 20, curY+34)
+
+      // Confidence band badge
+      doc.setFillColor(...bandColor); doc.roundedRect(65, curY+18, 32, 9, 2, 2, 'F')
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(255,255,255)
+      doc.text(confidenceBand, 81, curY+24, {align:'center'})
 
       // Year breakdown
-      yearStats.forEach((yr, i) => {
-        const x = 90 + i * 38
-        doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(...GMU_NAVY)
-        doc.text(`${yr.pct}%`, x, 63)
-        doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(100,100,100)
-        doc.text(yr.year, x, 68)
-        doc.text(`${yr.qualifying}/${yr.total} students`, x, 73)
+      yearStats.forEach((yr,i) => {
+        const x = 110 + i*30
+        doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(...GMU_NAVY)
+        doc.text(`${yr.pct}%`, x, curY+20)
+        doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(100,100,100)
+        doc.text(yr.year, x, curY+26)
+        doc.text(`${yr.qualifying}/${yr.total}`, x, curY+31)
       })
 
       // ── Student table ──
+      curY = 106
       doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...GMU_NAVY)
-      doc.text('Qualifying Students — Evidence of Research Impact', 14, 89)
+      doc.text(`Qualifying Postgraduate Students (${impacts.length})`, 14, curY)
+      curY += 4
 
-      const impactTypes = (item) => {
-        const t = []
-        if (item.has_publication || item.supervisor_has_publication) t.push('Publication')
-        if (item.has_ip || item.supervisor_has_ip) t.push('IP')
-        if (item.has_industry_partner || item.supervisor_has_industry_partner) t.push('Industry')
-        if (item.has_public_events) t.push('Events')
-        if (item.has_policy_citation) t.push('Policy')
-        if (item.has_commercialisation) t.push('Revenue')
-        return t.join(', ') || 'Other'
-      }
-
-      const rows = (impacts || []).map((item, idx) => {
-        const s = item.students
-        const orcidMilestone = s?.student_milestones?.find(m => m.milestone_id === 'orcid')
+      const studentRows = impacts.map((item,idx) => {
+        const s    = item.students
+        const orcid= s?.student_milestones?.find(m=>m.milestone_id==='orcid')?.status==='completed'
         return [
-          idx + 1,
-          s?.name || '—',
-          s?.student_id || '—',
-          s?.supervisors?.name || '—',
-          (item.thesis_title || s?.thesis_title || '—').substring(0, 45) + ((item.thesis_title || '').length > 45 ? '…' : ''),
-          item.academic_year || '—',
+          idx+1,
+          s?.name||'—',
+          s?.student_id||'—',
+          s?.supervisors?.name||'—',
+          (item.thesis_title||s?.thesis_title||'—').substring(0,38) + ((item.thesis_title||'').length>38?'…':''),
+          item.academic_year||'—',
           impactTypes(item),
-          item.supervisor_confirmed ? '✓' : '—',
-          orcidMilestone?.status === 'completed' ? '✓' : '—',
+          item.supervisor_confirmed?'✓':'—',
+          orcid?'✓':'—',
         ]
       })
 
       doc.autoTable({
-        startY: 93,
-        head: [['#', 'Student', 'ID', 'Supervisor', 'Thesis Title', 'Year', 'Impact Type(s)', 'Sup.Conf', 'ORCID']],
-        body: rows,
-        styles:     { fontSize: 7, cellPadding: 2.5 },
-        headStyles: { fillColor: GMU_NAVY, textColor: [255,255,255], fontStyle: 'bold', fontSize: 7 },
-        columnStyles: {
-          0: { cellWidth: 8 },
-          1: { cellWidth: 28 },
-          2: { cellWidth: 16 },
-          3: { cellWidth: 25 },
-          4: { cellWidth: 45 },
-          5: { cellWidth: 16 },
-          6: { cellWidth: 28 },
-          7: { cellWidth: 11 },
-          8: { cellWidth: 11 },
-        },
-        alternateRowStyles: { fillColor: [248, 249, 251] },
-        didParseCell: (data) => {
-          if (data.column.index === 7 && data.cell.raw === '✓') data.cell.styles.textColor = [16,185,129]
-          if (data.column.index === 8 && data.cell.raw === '✓') data.cell.styles.textColor = [16,185,129]
+        startY: curY,
+        head:[['#','Student Name','ID','Supervisor','Thesis Title','Year','Impact','Sup','ORCID']],
+        body: studentRows,
+        styles:{fontSize:7,cellPadding:2.5},
+        headStyles:{fillColor:GMU_NAVY,textColor:[255,255,255],fontStyle:'bold',fontSize:7.5},
+        columnStyles:{0:{cellWidth:8},1:{cellWidth:30},2:{cellWidth:16},3:{cellWidth:28},4:{cellWidth:40},5:{cellWidth:14},6:{cellWidth:25},7:{cellWidth:10},8:{cellWidth:10}},
+        alternateRowStyles:{fillColor:[248,249,251]},
+        didParseCell(data) {
+          if((data.column.index===7||data.column.index===8) && data.cell.raw==='✓')
+            data.cell.styles.textColor=[16,185,129]
         }
       })
 
-      // ── Evidence links section ──
-      let curY = doc.lastAutoTable.finalY + 8
-      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...GMU_NAVY)
-      doc.text('Evidence Files', 14, curY)
-      curY += 5
+      // ── Evidence appendix ──
+      curY = doc.lastAutoTable.finalY + 10
+      if (curY > pageH - 50) { doc.addPage(); curY = 20 }
 
-      ;(impacts || []).forEach(item => {
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...GMU_NAVY)
+      doc.text('Evidence Appendix', 14, curY)
+      doc.setDrawColor(...GMU_GOLD); doc.setLineWidth(0.5)
+      doc.line(14, curY+2, pageW-14, curY+2)
+      curY += 8
+
+      impacts.forEach(item => {
         const s = item.students
-        const allEvidence = [...(item.evidence_files || []), ...(item.supervisor_evidence_files || [])]
+        const allEvidence = [...(item.evidence_files||[]),...(item.supervisor_evidence_files||[])]
         if (!allEvidence.length) return
+        if (curY > pageH-40) { doc.addPage(); curY=20 }
 
-        if (curY > pageH - 40) { doc.addPage(); curY = 20 }
-
-        doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...GMU_NAVY)
-        doc.text(`${s?.name || '—'} — ${(item.thesis_title || s?.thesis_title || '').substring(0,60)}`, 14, curY)
-        curY += 4
+        doc.setFillColor(245,247,250); doc.roundedRect(14,curY-4,pageW-28,7,1,1,'F')
+        doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(...GMU_NAVY)
+        doc.text(`${s?.name||'—'}`, 16, curY)
+        doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(100,100,100)
+        doc.text(` — ${(item.thesis_title||s?.thesis_title||'').substring(0,65)}`, 16+doc.getTextWidth(`${s?.name||'—'}`), curY)
+        curY += 6
 
         allEvidence.forEach(ev => {
-          if (curY > pageH - 30) { doc.addPage(); curY = 20 }
-          doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(100,100,100)
-          doc.text(`  📄 ${ev.impactType}:`, 14, curY)
-          doc.setTextColor(37, 99, 235)
-          doc.textWithLink(ev.fileName || ev.fileUrl, 55, curY, { url: ev.fileUrl })
-          curY += 4.5
+          if (curY > pageH-25) { doc.addPage(); curY=20 }
+          doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(80,80,80)
+          doc.text(`  ▸ ${ev.impactType}:  `, 16, curY)
+          const labelW = doc.getTextWidth(`  ▸ ${ev.impactType}:  `)
+          doc.setTextColor(37,99,235)
+          doc.textWithLink(ev.fileName||'View File', 16+labelW, curY, {url:ev.fileUrl})
+          curY += 5
         })
-        curY += 2
+        curY += 3
+      })
+
+      // ── Contact list ──
+      if (curY > pageH-60) { doc.addPage(); curY=20 }
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...GMU_NAVY)
+      doc.text('Contact List (for ERT Verification)', 14, curY)
+      doc.setDrawColor(...GMU_GOLD); doc.line(14,curY+2,pageW-14,curY+2)
+      curY += 6
+
+      const contactRows = impacts.map(item => {
+        const s = item.students
+        return [
+          s?.name||'—',
+          s?.email||'—',
+          s?.supervisors?.name||'—',
+          s?.supervisors?.email||'—',
+        ]
+      })
+
+      doc.autoTable({
+        startY: curY,
+        head:[['Student Name','Student Email','Supervisor Name','Supervisor Email']],
+        body: contactRows,
+        styles:{fontSize:7.5,cellPadding:2.5},
+        headStyles:{fillColor:GMU_NAVY,textColor:[255,255,255],fontStyle:'bold'},
+        columnStyles:{0:{cellWidth:42},1:{cellWidth:52},2:{cellWidth:42},3:{cellWidth:52}},
+        alternateRowStyles:{fillColor:[248,249,251]},
       })
 
       // ── Signatures ──
-      const signers = [{ name: sigs.coordinator.name, title: sigs.coordinator.title }]
-      if (sigs.hod?.name)  signers.push({ name: sigs.hod.name,  title: 'Head of Department' })
-      if (sigs.dean?.name) signers.push({ name: sigs.dean.name, title: 'Dean' })
-      const sigY = Math.min(curY + 8, pageH - 30)
-      const colW = (pageW - 28) / signers.length
-      signers.forEach((signer, i) => {
-        const x = 14 + i * colW
+      curY = doc.lastAutoTable.finalY + 12
+      if (curY > pageH-35) { doc.addPage(); curY=20 }
+      const signers = [{name:sigs.coordinator.name,title:sigs.coordinator.title}]
+      if(sigs.hod?.name) signers.push({name:sigs.hod.name,title:'Head of Department'})
+      if(sigs.dean?.name) signers.push({name:sigs.dean.name,title:'Dean'})
+      const colW = (pageW-28)/signers.length
+      signers.forEach((signer,i) => {
+        const x = 14+i*colW
         doc.setDrawColor(...GMU_GOLD); doc.setLineWidth(0.8)
-        doc.line(x, sigY, x + colW*0.6, sigY)
+        doc.line(x,curY,x+colW*0.7,curY)
         doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...GMU_NAVY)
-        doc.text(signer.name, x, sigY+5)
+        doc.text(signer.name,x,curY+6)
         doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(100,100,100)
-        doc.text(signer.title, x, sigY+9)
-        doc.text('Gulf Medical University', x, sigY+13)
+        doc.text(signer.title,x,curY+11)
+        doc.text('Gulf Medical University',x,curY+16)
+        doc.text(new Date().toLocaleDateString('en-GB'),x,curY+21)
       })
 
-      doc.save(`KPI-4.4-Research-Participation-${currentYear}.pdf`)
-    } catch(e) { console.error('KPI 4.4 report error:', e) }
+      doc.save(`KPI-4.4-PG-${currentYear}.pdf`)
+    } catch(e) { console.error('KPI 4.4 PG PDF error:', e) }
   }
 
-  async function generateKPI44Excel() {
+  // ── KPI 4.4 UG PDF ───────────────────────────────────────────────────────────
+  async function generateKPI44UGReport() {
     try {
-      const { supabase } = await import('../lib/supabase')
-      let q = supabase.from('research_impact')
-        .select('*, students(id,name,email,student_id,enrollment_year,thesis_title,program_level,supervisors(name,email),student_milestones(milestone_id,status))')
-        .eq('status','approved').order('academic_year', { ascending: false })
-      if (effectiveDeptId) q = q.eq('department_id', effectiveDeptId)
-      const { data: impacts } = await q
-      const allStudents = await getStudentsWithProgress(effectiveDeptId, effectiveProgLevel)
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js')
+      const jsPDF = window.jspdf?.jsPDF || window.jsPDF
+      if (!jsPDF) throw new Error('PDF library failed to load')
 
-      const currentYear = (() => { const n=new Date(); const y=n.getFullYear(); return n.getMonth()+1>=9?`${y}-${y+1}`:`${y-1}-${y}` })()
-      const years = [currentYear,
-        (() => { const [a,b]=currentYear.split('-').map(Number); return `${a-1}-${b-1}` })(),
-        (() => { const [a,b]=currentYear.split('-').map(Number); return `${a-2}-${b-2}` })(),
-      ]
+      const impacts     = await loadImpactData('Undergraduate')
+      const allStudents = await getStudentsWithProgress(effectiveDeptId, 'Undergraduate')
+      const currentYear = getCurrentYear()
+      const years       = getYears(currentYear)
+
       const yearStats = years.map(yr => {
-        const qualifying = (impacts||[]).filter(i => i.academic_year === yr).length
-        const total = allStudents.length
-        return { year: yr, qualifying, total, pct: total ? Math.round(qualifying/total*100) : 0 }
+        const yrImpacts  = impacts.filter(i=>i.academic_year===yr)
+        const qualifying = yrImpacts.reduce((sum,i)=>sum+(i.students?.research_groups?.students?.length||1),0)
+        const total      = allStudents.length
+        return {year:yr, qualifying, total, pct:total?Math.round(qualifying/total*100):0, groups:yrImpacts.length}
       })
-      const rollingAvg = Math.round(yearStats.reduce((s,y)=>s+y.pct,0)/yearStats.length)
+      const rollingAvg  = Math.round(yearStats.reduce((s,y)=>s+y.pct,0)/yearStats.length)
+      const totalGroups = impacts.length
+      const totalStudentsQualifying = impacts.reduce((sum,i)=>sum+(i.students?.research_groups?.students?.length||1),0)
+
+      const confidenceBand = rollingAvg>=15?'VERY HIGH':rollingAvg>=12?'HIGH':rollingAvg>=6?'MEDIUM':rollingAvg>=3?'LOW':'VERY LOW'
+      const bandColor = rollingAvg>=12?[16,185,129]:rollingAvg>=6?[245,158,11]:[239,68,68]
+
+      const sigs  = getSignatures()
+      const dept  = session?.department?.name||'College of Health Sciences'
+      const doc   = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'})
+      const pageW = doc.internal.pageSize.getWidth()
+      const pageH = doc.internal.pageSize.getHeight()
+      let curY = 0
+
+      // ── Cover header ──
+      doc.setFillColor(...GMU_NAVY); doc.rect(0,0,pageW,32,'F')
+      doc.setFillColor(...GMU_GOLD); doc.rect(0,30,pageW,2.5,'F')
+      doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(255,255,255)
+      doc.text('KPI 4.4 — Undergraduate Student Research Participation', pageW/2, 13, {align:'center'})
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(212,168,67)
+      doc.text('OBEF Research Outcomes · Pillar 4 · Group-Based Research Projects', pageW/2, 22, {align:'center'})
+
+      // ── Meta ──
+      curY=40
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...GMU_NAVY)
+      doc.text(`Institution: Gulf Medical University`, 14, curY)
+      doc.text(`Department: ${dept}`, 14, curY+5)
+      doc.text(`Program Level: Undergraduate`, 14, curY+10)
+      doc.text(`Reporting Period: ${currentYear}`, pageW/2, curY)
+      doc.text(`Report Date: ${new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'})}`, pageW/2, curY+5)
+      doc.text(`Groups: ${totalGroups}  |  Qualifying Students: ${totalStudentsQualifying}  |  Total UG: ${allStudents.length}`, pageW/2, curY+10)
+
+      // ── KPI Summary box ──
+      curY=60
+      doc.setFillColor(245,247,250); doc.roundedRect(14,curY,pageW-28,38,3,3,'F')
+      doc.setDrawColor(...GMU_GOLD); doc.setLineWidth(0.6); doc.roundedRect(14,curY,pageW-28,38,3,3,'S')
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...GMU_NAVY)
+      doc.text('KPI 4.4 Summary', 20, curY+8)
+      doc.setFontSize(28); doc.text(`${rollingAvg}%`, 20, curY+28)
+      doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(100,100,100)
+      doc.text('3-Year Rolling Average', 20, curY+34)
+      doc.setFillColor(...bandColor); doc.roundedRect(65,curY+18,32,9,2,2,'F')
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(255,255,255)
+      doc.text(confidenceBand, 81, curY+24, {align:'center'})
+      yearStats.forEach((yr,i) => {
+        const x=110+i*30
+        doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(...GMU_NAVY)
+        doc.text(`${yr.pct}%`,x,curY+20)
+        doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(100,100,100)
+        doc.text(yr.year,x,curY+26)
+        doc.text(`${yr.qualifying} stu / ${yr.groups} grp`,x,curY+31)
+      })
+
+      // ── Groups table ──
+      curY=106
+      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...GMU_NAVY)
+      doc.text(`Qualifying Undergraduate Research Groups (${impacts.length})`, 14, curY)
+      curY+=4
+
+      const groupRows = impacts.map((item,idx) => {
+        const s     = item.students
+        const group = s?.research_groups
+        const members=(group?.students||[s]).map(m=>m?.name||'—').join(', ')
+        return [
+          idx+1,
+          group?.name||'No Group',
+          s?.supervisors?.name||'—',
+          (item.thesis_title||group?.thesis_title||s?.thesis_title||'—').substring(0,35)+'…',
+          item.academic_year||'—',
+          impactTypes(item),
+          item.supervisor_confirmed?'✓':'—',
+          members.substring(0,40)+(members.length>40?'…':''),
+        ]
+      })
+
+      doc.autoTable({
+        startY:curY,
+        head:[['#','Group','Supervisor','Thesis Title','Year','Impact','Sup','Members']],
+        body:groupRows,
+        styles:{fontSize:7,cellPadding:2.5},
+        headStyles:{fillColor:GMU_NAVY,textColor:[255,255,255],fontStyle:'bold',fontSize:7.5},
+        columnStyles:{0:{cellWidth:8},1:{cellWidth:22},2:{cellWidth:26},3:{cellWidth:36},4:{cellWidth:14},5:{cellWidth:22},6:{cellWidth:10},7:{cellWidth:50}},
+        alternateRowStyles:{fillColor:[248,249,251]},
+        didParseCell(data){if(data.column.index===6&&data.cell.raw==='✓')data.cell.styles.textColor=[16,185,129]}
+      })
+
+      // ── Evidence appendix ──
+      curY = doc.lastAutoTable.finalY+10
+      if(curY>pageH-50){doc.addPage();curY=20}
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...GMU_NAVY)
+      doc.text('Evidence Appendix',14,curY)
+      doc.setDrawColor(...GMU_GOLD); doc.line(14,curY+2,pageW-14,curY+2); curY+=8
+
+      impacts.forEach(item => {
+        const s=item.students; const group=s?.research_groups
+        const allEvidence=[...(item.evidence_files||[]),...(item.supervisor_evidence_files||[])]
+        if(!allEvidence.length) return
+        if(curY>pageH-40){doc.addPage();curY=20}
+        doc.setFillColor(245,247,250); doc.roundedRect(14,curY-4,pageW-28,7,1,1,'F')
+        doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(...GMU_NAVY)
+        doc.text(`${group?.name||s?.name||'—'}`,16,curY)
+        doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(100,100,100)
+        doc.text(` — ${(item.thesis_title||group?.thesis_title||'').substring(0,60)}`,16+doc.getTextWidth(`${group?.name||s?.name||'—'}`),curY)
+        curY+=6
+        allEvidence.forEach(ev=>{
+          if(curY>pageH-25){doc.addPage();curY=20}
+          doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(80,80,80)
+          doc.text(`  ▸ ${ev.impactType}:  `,16,curY)
+          const lw=doc.getTextWidth(`  ▸ ${ev.impactType}:  `)
+          doc.setTextColor(37,99,235)
+          doc.textWithLink(ev.fileName||'View File',16+lw,curY,{url:ev.fileUrl}); curY+=5
+        }); curY+=3
+      })
+
+      // ── Contact list ──
+      if(curY>pageH-60){doc.addPage();curY=20}
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...GMU_NAVY)
+      doc.text('Contact List (for ERT Verification)',14,curY)
+      doc.setDrawColor(...GMU_GOLD); doc.line(14,curY+2,pageW-14,curY+2); curY+=6
+
+      const allContactRows = []
+      impacts.forEach(item => {
+        const s=item.students; const group=s?.research_groups
+        const members=group?.students||[s]
+        members.forEach(m=>{
+          allContactRows.push([m?.name||'—',m?.email||'—',group?.name||'No Group',s?.supervisors?.name||'—',s?.supervisors?.email||'—'])
+        })
+      })
+
+      doc.autoTable({
+        startY:curY,
+        head:[['Student Name','Student Email','Group','Supervisor','Supervisor Email']],
+        body:allContactRows,
+        styles:{fontSize:7.5,cellPadding:2.5},
+        headStyles:{fillColor:GMU_NAVY,textColor:[255,255,255],fontStyle:'bold'},
+        columnStyles:{0:{cellWidth:36},1:{cellWidth:46},2:{cellWidth:22},3:{cellWidth:36},4:{cellWidth:48}},
+        alternateRowStyles:{fillColor:[248,249,251]},
+      })
+
+      // ── Signatures ──
+      curY=doc.lastAutoTable.finalY+12
+      if(curY>pageH-35){doc.addPage();curY=20}
+      const signers=[{name:sigs.coordinator.name,title:sigs.coordinator.title}]
+      if(sigs.hod?.name) signers.push({name:sigs.hod.name,title:'Head of Department'})
+      if(sigs.dean?.name) signers.push({name:sigs.dean.name,title:'Dean'})
+      const colW=(pageW-28)/signers.length
+      signers.forEach((signer,i)=>{
+        const x=14+i*colW
+        doc.setDrawColor(...GMU_GOLD); doc.setLineWidth(0.8); doc.line(x,curY,x+colW*0.7,curY)
+        doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...GMU_NAVY)
+        doc.text(signer.name,x,curY+6)
+        doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(100,100,100)
+        doc.text(signer.title,x,curY+11); doc.text('Gulf Medical University',x,curY+16)
+        doc.text(new Date().toLocaleDateString('en-GB'),x,curY+21)
+      })
+
+      doc.save(`KPI-4.4-UG-${currentYear}.pdf`)
+    } catch(e) { console.error('KPI 4.4 UG PDF error:', e) }
+  }
+
+  // ── KPI 4.4 PG Excel ─────────────────────────────────────────────────────────
+  async function generateKPI44PGExcel() {
+    try {
+      const impacts     = await loadImpactData('Postgraduate')
+      const allStudents = await getStudentsWithProgress(effectiveDeptId, 'Postgraduate')
+      const currentYear = getCurrentYear()
+      const years       = getYears(currentYear)
+      const yearStats   = calcYearStats(impacts, allStudents, years, 'Postgraduate')
+      const rollingAvg  = Math.round(yearStats.reduce((s,y)=>s+y.pct,0)/yearStats.length)
 
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js')
-      const XLSX = window.XLSX
-      const wb = XLSX.utils.book_new()
+      const XLSX = window.XLSX; const wb = XLSX.utils.book_new()
 
-      // Summary sheet
-      const summaryData = [
-        ['KPI 4.4 — Student Participation Rate in Research'],
-        ['Department', session?.department?.name || 'College of Health Sciences'],
+      const ws1 = XLSX.utils.aoa_to_sheet([
+        ['KPI 4.4 — Postgraduate Student Research Participation'],
+        ['Department', session?.department?.name||''],
         ['Report Date', new Date().toLocaleDateString('en-GB')],
         [],
         ['3-Year Rolling Average', `${rollingAvg}%`],
         [],
-        ['Academic Year', 'Qualifying Students', 'Total Students', 'Rate (%)'],
-        ...yearStats.map(s => [s.year, s.qualifying, s.total, s.pct + '%']),
-      ]
-      const ws1 = XLSX.utils.aoa_to_sheet(summaryData)
-      ws1['!cols'] = [{wch:30},{wch:25},{wch:20},{wch:15}]
-      XLSX.utils.book_append_sheet(wb, ws1, 'Summary')
+        ['Academic Year','Qualifying Students','Total PG Students','Rate (%)'],
+        ...yearStats.map(s=>[s.year,s.qualifying,s.total,s.pct+'%']),
+      ])
+      ws1['!cols']=[{wch:30},{wch:25},{wch:25},{wch:15}]
+      XLSX.utils.book_append_sheet(wb, ws1, 'PG Summary')
 
-      // Student detail sheet
-      const headers = ['#','Student Name','Student ID','Supervisor','Thesis Title','Academic Year','Publication','IP','Industry','Events','Policy','Revenue','Supervisor Confirmed','ORCID','Evidence Files']
-      const rows = (impacts||[]).map((item,i) => {
+      const headers=['#','Student Name','Student ID','Supervisor','Thesis Title','Year','Publication','IP','Industry','Events','Policy','Revenue','Sup.Confirmed','ORCID','Evidence Files']
+      const rows = impacts.map((item,i) => {
         const s = item.students
-        const orcid = s?.student_milestones?.find(m=>m.milestone_id==='orcid')?.status === 'completed'
-        const allEvidence = [...(item.evidence_files||[]),...(item.supervisor_evidence_files||[])]
-        return [
-          i+1,
-          s?.name||'—', s?.student_id||'—', s?.supervisors?.name||'—',
-          item.thesis_title||s?.thesis_title||'—',
-          item.academic_year||'—',
+        const orcid = s?.student_milestones?.find(m=>m.milestone_id==='orcid')?.status==='completed'
+        const allEvidence=[...(item.evidence_files||[]),...(item.supervisor_evidence_files||[])]
+        return [i+1,s?.name||'—',s?.student_id||'—',s?.supervisors?.name||'—',
+          item.thesis_title||s?.thesis_title||'—',item.academic_year||'—',
           item.has_publication||item.supervisor_has_publication?'Yes':'',
           item.has_ip||item.supervisor_has_ip?'Yes':'',
           item.has_industry_partner||item.supervisor_has_industry_partner?'Yes':'',
-          item.has_public_events?'Yes':'',
-          item.has_policy_citation?'Yes':'',
+          item.has_public_events?'Yes':'',item.has_policy_citation?'Yes':'',
           item.has_commercialisation?'Yes':'',
-          item.supervisor_confirmed?'Yes':'',
-          orcid?'Yes':'',
-          allEvidence.map(e=>e.fileUrl).join(' | '),
-        ]
+          item.supervisor_confirmed?'Yes':'',orcid?'Yes':'',
+          allEvidence.map(e=>e.fileUrl).join(' | ')]
       })
-      const ws2 = XLSX.utils.aoa_to_sheet([headers, ...rows])
-      ws2['!cols'] = [{wch:5},{wch:25},{wch:15},{wch:25},{wch:40},{wch:12},{wch:12},{wch:8},{wch:12},{wch:10},{wch:10},{wch:10},{wch:18},{wch:10},{wch:60}]
-      XLSX.utils.book_append_sheet(wb, ws2, 'Student Detail')
-
-      XLSX.writeFile(wb, `KPI-4.4-Research-Participation-${currentYear}.xlsx`)
-    } catch(e) { console.error('KPI 4.4 Excel error:', e) }
+      const ws2 = XLSX.utils.aoa_to_sheet([headers,...rows])
+      ws2['!cols']=[{wch:5},{wch:25},{wch:15},{wch:25},{wch:45},{wch:12},{wch:12},{wch:8},{wch:12},{wch:10},{wch:10},{wch:10},{wch:15},{wch:10},{wch:60}]
+      XLSX.utils.book_append_sheet(wb, ws2, 'PG Student Detail')
+      XLSX.writeFile(wb, `KPI-4.4-PG-Research-${currentYear}.xlsx`)
+    } catch(e) { console.error('KPI 4.4 PG Excel error:', e) }
   }
 
-  async function emailKPI44Report(emailTo) {
-    setKpi44Sending(true); setKpi44Msg('')
+  // ── KPI 4.4 UG Excel ─────────────────────────────────────────────────────────
+  async function generateKPI44UGExcel() {
     try {
-      const { sendStudentEmail } = await import('../lib/emailService')
-      const currentYear = (() => { const n=new Date(); const y=n.getFullYear(); return n.getMonth()+1>=9?`${y}-${y+1}`:`${y-1}-${y}` })()
+      const impacts     = await loadImpactData('Undergraduate')
+      const allStudents = await getStudentsWithProgress(effectiveDeptId, 'Undergraduate')
+      const currentYear = getCurrentYear()
+      const years       = getYears(currentYear)
+      const yearStats   = years.map(yr => {
+        const yrImpacts  = impacts.filter(i=>i.academic_year===yr)
+        const qualifying = yrImpacts.reduce((sum,i)=>sum+(i.students?.research_groups?.students?.length||1),0)
+        const total      = allStudents.length
+        return {year:yr,qualifying,total,pct:total?Math.round(qualifying/total*100):0,groups:yrImpacts.length}
+      })
+      const rollingAvg = Math.round(yearStats.reduce((s,y)=>s+y.pct,0)/yearStats.length)
+
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js')
+      const XLSX = window.XLSX; const wb = XLSX.utils.book_new()
+
+      const ws1 = XLSX.utils.aoa_to_sheet([
+        ['KPI 4.4 — Undergraduate Student Research Participation (Group-Based)'],
+        ['Department', session?.department?.name||''],
+        ['Report Date', new Date().toLocaleDateString('en-GB')],
+        [],
+        ['3-Year Rolling Average', `${rollingAvg}%`],
+        [],
+        ['Academic Year','Qualifying Students','Groups','Total UG Students','Rate (%)'],
+        ...yearStats.map(s=>[s.year,s.qualifying,s.groups,s.total,s.pct+'%']),
+      ])
+      ws1['!cols']=[{wch:30},{wch:22},{wch:12},{wch:22},{wch:15}]
+      XLSX.utils.book_append_sheet(wb, ws1, 'UG Summary')
+
+      const headers=['#','Group Name','Supervisor','Thesis Title','Year','Impact Types','Sup.Confirmed','Members','Evidence Files']
+      const rows = impacts.map((item,i) => {
+        const s     = item.students
+        const group = s?.research_groups
+        const members=(group?.students||[s]).map(m=>m.name).join('; ')
+        const allEvidence=[...(item.evidence_files||[]),...(item.supervisor_evidence_files||[])]
+        return [i+1,group?.name||'No Group',s?.supervisors?.name||'—',
+          item.thesis_title||group?.thesis_title||s?.thesis_title||'—',
+          item.academic_year||'—',impactTypes(item),
+          item.supervisor_confirmed?'Yes':'',members,
+          allEvidence.map(e=>e.fileUrl).join(' | ')]
+      })
+      const ws2 = XLSX.utils.aoa_to_sheet([headers,...rows])
+      ws2['!cols']=[{wch:5},{wch:22},{wch:25},{wch:45},{wch:12},{wch:25},{wch:15},{wch:40},{wch:60}]
+      XLSX.utils.book_append_sheet(wb, ws2, 'UG Group Detail')
+      XLSX.writeFile(wb, `KPI-4.4-UG-Research-${currentYear}.xlsx`)
+    } catch(e) { console.error('KPI 4.4 UG Excel error:', e) }
+  }
+
+  // ── KPI 4.4 Email ────────────────────────────────────────────────────────────
+  async function emailKPI44Report(emailTo, level, setSending, setMsg) {
+    setSending(true); setMsg('')
+    try {
+      const currentYear = getCurrentYear()
       const appUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '')
       const result = await sendStudentEmail({
         student: { name: emailTo.split('@')[0], email: emailTo, token: '' },
         milestoneId: null,
-        subject: `KPI 4.4 Report — Student Research Participation ${currentYear}`,
-        message: `Please find below the KPI 4.4 — Student Participation Rate in Research report for ${currentYear}.\n\nTo download the full report with evidence links, please visit:\n${appUrl}/#/reports\n\nThis report has been generated from the GMU Thesis Coordination System.`,
+        subject: `KPI 4.4 ${level} Report — Student Research Participation ${currentYear}`,
+        message: `Please find the KPI 4.4 ${level} Research Participation report for ${currentYear}.\n\nDownload from: ${appUrl}/#/reports`,
       })
-      if (result?.ok !== false) {
-        setKpi44Msg('✓ Email sent to ' + emailTo)
-        setKpi44Email('')
-      } else {
-        setKpi44Msg('Failed: ' + (result?.message || 'Unknown error'))
-      }
-    } catch(e) { setKpi44Msg('Error: ' + e.message) }
-    setKpi44Sending(false)
+      if (result?.ok !== false) { setMsg('✓ Email sent to ' + emailTo) }
+      else { setMsg('Failed: ' + (result?.message||'Unknown error')) }
+    } catch(e) { setMsg('Error: ' + e.message) }
+    setSending(false)
   }
+
+
 
   return (
     <div className="p-8 space-y-6 fade-in">
@@ -1401,6 +1663,82 @@ export default function Reports() {
               <p className="text-xs font-semibold text-gold-400">{SIGNATURE.name}</p>
               <p className="text-xs text-navy-400">{SIGNATURE.title}</p>
             </div>
+          </div>
+
+          {/* ── KPI 4.4 PG Report ── */}
+          <div className="card p-5 space-y-4" style={{border:'1px solid rgba(212,168,67,0.25)'}}>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gold-500/15 border border-gold-500/30 flex items-center justify-center shrink-0 text-lg">🎓</div>
+              <div>
+                <h3 className="font-semibold text-slate-100 text-sm">KPI 4.4 — Postgraduate Research</h3>
+                <p className="text-xs text-navy-400">Individual thesis research · Evidence links · 3-year rolling average</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {['pdf','excel','email'].map(fmt => (
+                <button key={fmt} onClick={()=>setKpi44PGFormat(fmt)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all capitalize"
+                  style={kpi44PGFormat===fmt?{background:'#d4a843',color:'#0f1f36'}:{background:'rgba(255,255,255,0.05)',color:'rgba(148,163,184,0.8)',border:'1px solid rgba(255,255,255,0.1)'}}>
+                  {fmt==='pdf'?'📄 PDF':fmt==='excel'?'📊 Excel':'📧 Email'}
+                </button>
+              ))}
+            </div>
+            {kpi44PGFormat==='email'?(
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input className="input flex-1 text-sm" type="email" placeholder="recipient@gmu.ac.ae"
+                    value={kpi44PGEmail} onChange={e=>setKpi44PGEmail(e.target.value)}/>
+                  <button onClick={()=>kpi44PGEmail&&emailKPI44Report(kpi44PGEmail,'Postgraduate',setKpi44PGSending,setKpi44PGMsg)}
+                    disabled={kpi44PGSending||!kpi44PGEmail} className="btn-primary text-sm disabled:opacity-50">
+                    {kpi44PGSending?<Loader2 size={13} className="animate-spin"/>:'Send'}
+                  </button>
+                </div>
+                {kpi44PGMsg&&<p className={`text-xs ${kpi44PGMsg.startsWith('✓')?'text-emerald-400':'text-red-400'}`}>{kpi44PGMsg}</p>}
+              </div>
+            ):(
+              <button onClick={kpi44PGFormat==='pdf'?generateKPI44PGReport:generateKPI44PGExcel}
+                className="btn-primary text-sm flex items-center gap-2">
+                <FileText size={14}/>{kpi44PGFormat==='pdf'?'Download PG PDF':'Download PG Excel'}
+              </button>
+            )}
+          </div>
+
+          {/* ── KPI 4.4 UG Report ── */}
+          <div className="card p-5 space-y-4" style={{border:'1px solid rgba(212,168,67,0.25)'}}>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gold-500/15 border border-gold-500/30 flex items-center justify-center shrink-0 text-lg">🔬</div>
+              <div>
+                <h3 className="font-semibold text-slate-100 text-sm">KPI 4.4 — Undergraduate Research</h3>
+                <p className="text-xs text-navy-400">Group-based research · All members counted · 3-year rolling average</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {['pdf','excel','email'].map(fmt => (
+                <button key={fmt} onClick={()=>setKpi44UGFormat(fmt)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all capitalize"
+                  style={kpi44UGFormat===fmt?{background:'#d4a843',color:'#0f1f36'}:{background:'rgba(255,255,255,0.05)',color:'rgba(148,163,184,0.8)',border:'1px solid rgba(255,255,255,0.1)'}}>
+                  {fmt==='pdf'?'📄 PDF':fmt==='excel'?'📊 Excel':'📧 Email'}
+                </button>
+              ))}
+            </div>
+            {kpi44UGFormat==='email'?(
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input className="input flex-1 text-sm" type="email" placeholder="recipient@gmu.ac.ae"
+                    value={kpi44UGEmail} onChange={e=>setKpi44UGEmail(e.target.value)}/>
+                  <button onClick={()=>kpi44UGEmail&&emailKPI44Report(kpi44UGEmail,'Undergraduate',setKpi44UGSending,setKpi44UGMsg)}
+                    disabled={kpi44UGSending||!kpi44UGEmail} className="btn-primary text-sm disabled:opacity-50">
+                    {kpi44UGSending?<Loader2 size={13} className="animate-spin"/>:'Send'}
+                  </button>
+                </div>
+                {kpi44UGMsg&&<p className={`text-xs ${kpi44UGMsg.startsWith('✓')?'text-emerald-400':'text-red-400'}`}>{kpi44UGMsg}</p>}
+              </div>
+            ):(
+              <button onClick={kpi44UGFormat==='pdf'?generateKPI44UGReport:generateKPI44UGExcel}
+                className="btn-primary text-sm flex items-center gap-2">
+                <FileText size={14}/>{kpi44UGFormat==='pdf'?'Download UG PDF':'Download UG Excel'}
+              </button>
+            )}
           </div>
 
         </div>
