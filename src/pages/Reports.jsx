@@ -1079,7 +1079,7 @@ export default function Reports() {
                              rollingAvg >= 6  ? 'MEDIUM'    : rollingAvg >= 3  ? 'LOW' : 'VERY LOW'
       const bandColor = rollingAvg >= 12 ? [16,185,129] : rollingAvg >= 6 ? [245,158,11] : [239,68,68]
 
-      const doc   = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'})
+      const doc   = new jsPDF({orientation:'landscape',unit:'mm',format:'a4'})
       const pageW = doc.internal.pageSize.getWidth()
       const pageH = doc.internal.pageSize.getHeight()
       let curY = 0
@@ -1158,7 +1158,7 @@ export default function Reports() {
         body: studentRows,
         styles:{fontSize:7,cellPadding:2.5},
         headStyles:{fillColor:GMU_NAVY,textColor:[255,255,255],fontStyle:'bold',fontSize:7.5},
-        columnStyles:{0:{cellWidth:8},1:{cellWidth:30},2:{cellWidth:16},3:{cellWidth:28},4:{cellWidth:40},5:{cellWidth:14},6:{cellWidth:25},7:{cellWidth:10},8:{cellWidth:10}},
+        columnStyles:{0:{cellWidth:8},1:{cellWidth:38},2:{cellWidth:18},3:{cellWidth:32},4:{cellWidth:68},5:{cellWidth:16},6:{cellWidth:32},7:{cellWidth:12},8:{cellWidth:12}},
         alternateRowStyles:{fillColor:[248,249,251]},
         didParseCell(data) {
           if((data.column.index===7||data.column.index===8) && data.cell.raw==='✓')
@@ -1227,7 +1227,7 @@ export default function Reports() {
         body: contactRows,
         styles:{fontSize:7.5,cellPadding:2.5},
         headStyles:{fillColor:GMU_NAVY,textColor:[255,255,255],fontStyle:'bold'},
-        columnStyles:{0:{cellWidth:36},1:{cellWidth:46},2:{cellWidth:16},3:{cellWidth:34},4:{cellWidth:44},5:{cellWidth:12}},
+        columnStyles:{0:{cellWidth:40},1:{cellWidth:60},2:{cellWidth:20},3:{cellWidth:40},4:{cellWidth:60},5:{cellWidth:16}},
         alternateRowStyles:{fillColor:[248,249,251]},
         didParseCell(data){
           if(data.column.index===5&&data.cell.raw==='✓')
@@ -1286,7 +1286,7 @@ export default function Reports() {
 
       const sigs  = getSignatures()
       const dept  = session?.department?.name||'College of Health Sciences'
-      const doc   = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'})
+      const doc   = new jsPDF({orientation:'landscape',unit:'mm',format:'a4'})
       const pageW = doc.internal.pageSize.getWidth()
       const pageH = doc.internal.pageSize.getHeight()
       let curY = 0
@@ -1358,7 +1358,7 @@ export default function Reports() {
         body:groupRows,
         styles:{fontSize:7,cellPadding:2.5},
         headStyles:{fillColor:GMU_NAVY,textColor:[255,255,255],fontStyle:'bold',fontSize:7.5},
-        columnStyles:{0:{cellWidth:8},1:{cellWidth:22},2:{cellWidth:26},3:{cellWidth:36},4:{cellWidth:14},5:{cellWidth:22},6:{cellWidth:10},7:{cellWidth:50}},
+        columnStyles:{0:{cellWidth:8},1:{cellWidth:28},2:{cellWidth:30},3:{cellWidth:60},4:{cellWidth:16},5:{cellWidth:28},6:{cellWidth:12},7:{cellWidth:80}},
         alternateRowStyles:{fillColor:[248,249,251]},
         didParseCell(data){if(data.column.index===6&&data.cell.raw==='✓')data.cell.styles.textColor=[16,185,129]}
       })
@@ -1424,7 +1424,7 @@ export default function Reports() {
         body:allContactRows,
         styles:{fontSize:7,cellPadding:2.5},
         headStyles:{fillColor:GMU_NAVY,textColor:[255,255,255],fontStyle:'bold'},
-        columnStyles:{0:{cellWidth:28},1:{cellWidth:40},2:{cellWidth:14},3:{cellWidth:20},4:{cellWidth:28},5:{cellWidth:40},6:{cellWidth:10}},
+        columnStyles:{0:{cellWidth:34},1:{cellWidth:54},2:{cellWidth:18},3:{cellWidth:28},4:{cellWidth:34},5:{cellWidth:54},6:{cellWidth:14}},
         alternateRowStyles:{fillColor:[248,249,251]},
         didParseCell(data){
           if(data.column.index===6&&data.cell.raw==='✓')
