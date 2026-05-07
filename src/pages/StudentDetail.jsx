@@ -40,9 +40,13 @@ export default function StudentDetail() {
 
   // Notes
   const [notes, setNotes]           = useState([])
-  const [impact, setImpact]         = useState(null)
+  const [impact, setImpact]             = useState(null)
   const [sendingImpact, setSendingImpact] = useState(false)
-  const [impactMsg, setImpactMsg]   = useState('')
+  const [impactMsg, setImpactMsg]       = useState('')
+  const [needsInfoNote, setNeedsInfoNote] = useState('')
+  const [showNeedsInfo, setShowNeedsInfo] = useState(false)
+  const [editingImpact, setEditingImpact] = useState(false)
+  const [impactEditForm, setImpactEditForm] = useState({})
   const [newNote, setNewNote]       = useState('')
   const [savingNote, setSavingNote] = useState(false)
 
@@ -110,6 +114,40 @@ export default function StudentDetail() {
         .eq('id', impact.id).select().single()
       setImpact(data)
     } catch(e) { console.error(e) }
+  }
+
+  async function saveImpactEdits() {
+    if (!impact) return
+    try {
+      const { supabase } = await import('../lib/supabase')
+      const { data } = await supabase
+        .from('research_impact')
+        .update({
+          thesis_title:          impactEditForm.thesis_title          ?? impact.thesis_title,
+          industry_partner_name: impactEditForm.industry_partner_name ?? impact.industry_partner_name,
+          student_comments:      impactEditForm.student_comments      ?? impact.student_comments,
+          has_publication:       impactEditForm.has_publication       ?? impact.has_publication,
+          has_ip:                impactEditForm.has_ip                ?? impact.has_ip,
+          has_industry_partner:  impactEditForm.has_industry_partner  ?? impact.has_industry_partner,
+          has_public_events:     impactEditForm.has_public_events     ?? impact.has_public_events,
+          has_policy_citation:   impactEditForm.has_policy_citation   ?? impact.has_policy_citation,
+          has_commercialisation: impactEditForm.has_commercialisation ?? impact.has_commercialisation,
+          supervisor_has_publication:       impactEditForm.supervisor_has_publication       ?? impact.supervisor_has_publication,
+          supervisor_has_ip:                impactEditForm.supervisor_has_ip                ?? impact.supervisor_has_ip,
+          supervisor_has_industry_partner:  impactEditForm.supervisor_has_industry_partner  ?? impact.supervisor_has_industry_partner,
+          supervisor_has_public_events:     impactEditForm.supervisor_has_public_events     ?? impact.supervisor_has_public_events,
+          supervisor_has_policy_citation:   impactEditForm.supervisor_has_policy_citation   ?? impact.supervisor_has_policy_citation,
+          supervisor_has_commercialisation: impactEditForm.supervisor_has_commercialisation ?? impact.supervisor_has_commercialisation,
+          no_impact:             impactEditForm.no_impact             ?? impact.no_impact,
+          academic_year:         impactEditForm.academic_year         ?? impact.academic_year,
+        })
+        .eq('id', impact.id).select().single()
+      setImpact(data)
+      setEditingImpact(false)
+      setImpactEditForm({})
+      setImpactMsg('✓ Saved')
+      setTimeout(()=>setImpactMsg(''),3000)
+    } catch(e) { setImpactMsg('Error: '+e.message) }
   }
 
   useEffect(() => { load() }, [id])
@@ -507,13 +545,39 @@ export default function StudentDetail() {
             <div className="card p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-slate-100">Research Impact Declaration</h3>
-                <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                  impact.status==='approved'   ? 'bg-emerald-500/15 text-emerald-400' :
-                  impact.status==='needs_info' ? 'bg-amber-500/15 text-amber-400' :
-                  'bg-navy-600/50 text-navy-300'
-                }`}>
-                  {impact.status==='approved' ? '✓ Approved' : impact.status==='needs_info' ? '⚠ Needs Info' : '● Pending Review'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                    impact.status==='approved'   ? 'bg-emerald-500/15 text-emerald-400' :
+                    impact.status==='needs_info' ? 'bg-amber-500/15 text-amber-400' :
+                    'bg-navy-600/50 text-navy-300'
+                  }`}>
+                    {impact.status==='approved' ? '✓ Approved' : impact.status==='needs_info' ? '⚠ Needs Info' : '● Pending Review'}
+                  </span>
+                  <button onClick={()=>{
+                    setEditingImpact(v=>!v)
+                    setImpactEditForm({
+                      thesis_title:          impact.thesis_title||'',
+                      industry_partner_name: impact.industry_partner_name||'',
+                      student_comments:      impact.student_comments||'',
+                      academic_year:         impact.academic_year||'',
+                      has_publication:       impact.has_publication||false,
+                      has_ip:                impact.has_ip||false,
+                      has_industry_partner:  impact.has_industry_partner||false,
+                      has_public_events:     impact.has_public_events||false,
+                      has_policy_citation:   impact.has_policy_citation||false,
+                      has_commercialisation: impact.has_commercialisation||false,
+                      supervisor_has_publication:       impact.supervisor_has_publication||false,
+                      supervisor_has_ip:                impact.supervisor_has_ip||false,
+                      supervisor_has_industry_partner:  impact.supervisor_has_industry_partner||false,
+                      supervisor_has_public_events:     impact.supervisor_has_public_events||false,
+                      supervisor_has_policy_citation:   impact.supervisor_has_policy_citation||false,
+                      supervisor_has_commercialisation: impact.supervisor_has_commercialisation||false,
+                      no_impact:             impact.no_impact||false,
+                    })
+                  }} className="btn-ghost p-1.5 rounded-lg" title="Edit">
+                    <Edit2 size={13} className="text-navy-400"/>
+                  </button>
+                </div>
               </div>
               <p className="text-xs text-navy-400">Submitted {new Date(impact.submitted_at).toLocaleDateString('en-GB')}</p>
               {impact.supervisor_submitted_at && (
@@ -533,6 +597,87 @@ export default function StudentDetail() {
                 ))}
                 {impact.no_impact && <div className="col-span-2 px-3 py-2 rounded-xl text-xs bg-navy-700/30 text-navy-400 border border-navy-700/20">No impact criteria met</div>}
               </div>
+
+              {/* Inline edit form */}
+              {editingImpact && (
+                <div className="space-y-3 p-3 rounded-xl bg-navy-800/30 border border-navy-700/40">
+                  <p className="text-xs font-semibold text-navy-400 uppercase tracking-wider">Edit Research Impact</p>
+
+                  <div>
+                    <label className="block text-xs text-navy-500 mb-1">Thesis Title</label>
+                    <input className="input w-full text-sm" value={impactEditForm.thesis_title||''}
+                      onChange={e=>setImpactEditForm(p=>({...p,thesis_title:e.target.value}))}/>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-navy-500 mb-1">Academic Year</label>
+                    <input className="input w-full text-sm" value={impactEditForm.academic_year||''}
+                      placeholder="e.g. 2024-2025"
+                      onChange={e=>setImpactEditForm(p=>({...p,academic_year:e.target.value}))}/>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-navy-500 mb-2">Student Declared Impact</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        ['has_publication','Publication'],['has_ip','IP'],
+                        ['has_industry_partner','Industry'],['has_public_events','Events'],
+                        ['has_policy_citation','Policy'],['has_commercialisation','Revenue'],
+                      ].map(([key,label])=>(
+                        <button key={key} onClick={()=>setImpactEditForm(p=>({...p,[key]:!p[key]}))}
+                          className={`px-3 py-2 rounded-xl text-xs font-medium text-left transition-all ${
+                            impactEditForm[key]?'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                            :'bg-navy-800/40 text-navy-500 border border-navy-700/30'}`}>
+                          {impactEditForm[key]?'✓':'✗'} {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-navy-500 mb-2">Supervisor Confirmed Impact</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        ['supervisor_has_publication','Publication'],['supervisor_has_ip','IP'],
+                        ['supervisor_has_industry_partner','Industry'],['supervisor_has_public_events','Events'],
+                        ['supervisor_has_policy_citation','Policy'],['supervisor_has_commercialisation','Revenue'],
+                      ].map(([key,label])=>(
+                        <button key={key} onClick={()=>setImpactEditForm(p=>({...p,[key]:!p[key]}))}
+                          className={`px-3 py-2 rounded-xl text-xs font-medium text-left transition-all ${
+                            impactEditForm[key]?'bg-blue-500/15 text-blue-400 border border-blue-500/30'
+                            :'bg-navy-800/40 text-navy-500 border border-navy-700/30'}`}>
+                          {impactEditForm[key]?'✓':'✗'} {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-navy-500 mb-1">Industry Partner Name</label>
+                    <input className="input w-full text-sm" value={impactEditForm.industry_partner_name||''}
+                      onChange={e=>setImpactEditForm(p=>({...p,industry_partner_name:e.target.value}))}/>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-navy-500 mb-1">Student Comments</label>
+                    <textarea className="input w-full text-sm resize-none" rows={2}
+                      value={impactEditForm.student_comments||''}
+                      onChange={e=>setImpactEditForm(p=>({...p,student_comments:e.target.value}))}/>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button onClick={saveImpactEdits}
+                      className="btn-primary text-sm flex items-center gap-2">
+                      <Save size={13}/> Save Changes
+                    </button>
+                    <button onClick={()=>{setEditingImpact(false);setImpactEditForm({})}}
+                      className="btn-ghost text-sm flex items-center gap-2">
+                      <X size={13}/> Cancel
+                    </button>
+                    {impactMsg && <p className={`text-xs ${impactMsg.startsWith('✓')?'text-emerald-400':'text-red-400'}`}>{impactMsg}</p>}
+                  </div>
+                </div>
+              )}
               {impact.evidence_files?.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-navy-400 uppercase tracking-wider mb-2">Evidence Files</p>
@@ -551,17 +696,44 @@ export default function StudentDetail() {
                   </div>
                 </div>
               )}
-              {/* Coordinator can approve when student submitted but supervisor hasn't confirmed */}
               {impact.status !== 'approved' && impact.submitted_at && !impact.supervisor_confirmed && (
-                <div className="flex gap-2 pt-2 border-t border-navy-700/40">
-                  <button onClick={()=>updateImpactStatus('approved','')}
-                    className="flex-1 py-2 rounded-xl text-sm font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25 transition-all">
-                    ✓ Approve for KPI 4.4
-                  </button>
-                  <button onClick={()=>{const n=prompt('What additional information is needed?');if(n)updateImpactStatus('needs_info',n)}}
-                    className="flex-1 py-2 rounded-xl text-sm font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-all">
-                    ⚠ Request Info
-                  </button>
+                <div className="space-y-2 pt-2 border-t border-navy-700/40">
+                  <div className="flex gap-2">
+                    <button onClick={()=>updateImpactStatus('approved','')}
+                      className="flex-1 py-2 rounded-xl text-sm font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25 transition-all">
+                      ✓ Approve for KPI 4.4
+                    </button>
+                    <button onClick={()=>setShowNeedsInfo(v=>!v)}
+                      className="flex-1 py-2 rounded-xl text-sm font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-all">
+                      ⚠ Request Info
+                    </button>
+                  </div>
+                  {showNeedsInfo && (
+                    <div className="space-y-2">
+                      <textarea
+                        className="input w-full text-sm resize-none"
+                        rows={3}
+                        placeholder="Describe what additional information is needed from the student…"
+                        value={needsInfoNote}
+                        onChange={e=>setNeedsInfoNote(e.target.value)}/>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={()=>{
+                            if(needsInfoNote.trim()){
+                              updateImpactStatus('needs_info', needsInfoNote.trim())
+                              setShowNeedsInfo(false)
+                              setNeedsInfoNote('')
+                            }
+                          }}
+                          disabled={!needsInfoNote.trim()}
+                          className="btn-primary text-xs py-1.5 disabled:opacity-50">
+                          Send Request
+                        </button>
+                        <button onClick={()=>{setShowNeedsInfo(false);setNeedsInfoNote('')}}
+                          className="btn-ghost text-xs py-1.5">Cancel</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               {impact.status === 'approved' && (
