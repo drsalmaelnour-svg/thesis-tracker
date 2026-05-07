@@ -131,9 +131,12 @@ export default function SupervisorResearchImpact() {
       }
 
       if (data.impact?.id) {
-        await supabase.from('research_impact').update(update).eq('id',data.impact.id)
+        await supabase.from('research_impact').update({
+          ...update,
+          status: 'approved',  // supervisor submission = auto-approved
+        }).eq('id',data.impact.id)
       } else {
-        // No student submission yet — create the record
+        // No student submission yet — create the record auto-approved
         await supabase.from('research_impact').insert({
           student_id:    data.student.id,
           department_id: data.student.department_id,
@@ -142,6 +145,7 @@ export default function SupervisorResearchImpact() {
           thesis_title:  data.student.thesis_title,
           no_impact:     false,
           evidence_files:[],
+          status:        'approved',  // auto-approved on supervisor submission
           ...update,
         })
       }
