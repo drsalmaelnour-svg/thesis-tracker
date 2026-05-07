@@ -473,9 +473,9 @@ export default function StudentDetail() {
       {activeTab==='Research Impact' && (
         <div className="space-y-4">
           {!impact ? (
-            <div className="card p-5">
+            <div className="card p-5 space-y-4">
               <h3 className="font-semibold text-slate-100 mb-1">Research Impact Survey</h3>
-              <p className="text-xs text-navy-400 mb-4">
+              <p className="text-xs text-navy-400">
                 Send {student?.name} a link to declare their research impact for KPI 4.4.
                 You can send to the student, supervisor, or both — supervisor can submit before the student.
               </p>
@@ -500,8 +500,8 @@ export default function StudentDetail() {
                   </button>
                 )}
               </div>
-              {impactMsg && <p className="text-xs mt-3 text-emerald-400 break-all">{impactMsg}</p>}
-              {!student?.email && <p className="text-xs mt-2 text-amber-400">⚠ No email address on file.</p>}
+              {impactMsg && <p className="text-xs text-emerald-400 break-all">{impactMsg}</p>}
+              {!student?.email && <p className="text-xs text-amber-400">⚠ No email address on file.</p>}
             </div>
           ) : (
             <div className="card p-5 space-y-4">
@@ -551,12 +551,26 @@ export default function StudentDetail() {
                   </div>
                 </div>
               )}
-              {impact.status==='pending' && (
+              {/* Coordinator can approve when student submitted but supervisor hasn't confirmed */}
+              {impact.status !== 'approved' && impact.submitted_at && !impact.supervisor_confirmed && (
                 <div className="flex gap-2 pt-2 border-t border-navy-700/40">
                   <button onClick={()=>updateImpactStatus('approved','')}
-                    className="flex-1 py-2 rounded-xl text-sm font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25 transition-all">✓ Approve</button>
+                    className="flex-1 py-2 rounded-xl text-sm font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25 transition-all">
+                    ✓ Approve for KPI 4.4
+                  </button>
                   <button onClick={()=>{const n=prompt('What additional information is needed?');if(n)updateImpactStatus('needs_info',n)}}
-                    className="flex-1 py-2 rounded-xl text-sm font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-all">⚠ Request Info</button>
+                    className="flex-1 py-2 rounded-xl text-sm font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-all">
+                    ⚠ Request Info
+                  </button>
+                </div>
+              )}
+              {impact.status === 'approved' && (
+                <div className="flex items-center gap-2 pt-2 border-t border-navy-700/40">
+                  <span className="text-xs text-emerald-400 flex-1">✓ Approved — counted in KPI 4.4</span>
+                  <button onClick={()=>updateImpactStatus('pending','')}
+                    className="text-xs text-navy-500 hover:text-navy-300 transition-colors">
+                    Revoke
+                  </button>
                 </div>
               )}
               <div className="pt-2 border-t border-navy-700/30">
