@@ -6,9 +6,12 @@ import {
 } from 'lucide-react'
 import { getStudentsWithProgress, getSupervisorCheckins, MILESTONES } from '../lib/supabase'
 import { sendStudentEmail } from '../lib/emailService'
+import { getSession } from '../lib/auth'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const INSTITUTION = 'Gulf Medical University'
+const GMU_NAVY    = [30, 58, 95]
+const GMU_GOLD    = [212, 168, 67]
 
 function getSignatures() {
   try {
