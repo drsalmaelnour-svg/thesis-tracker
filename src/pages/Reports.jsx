@@ -988,12 +988,13 @@ export default function Reports() {
         evidence_files, supervisor_evidence_files,
         industry_partner_name, student_comments, supervisor_comments
       `)
-      .eq('status','approved')
+      .in('status',['approved','pending','needs_info'])
       .order('academic_year',{ascending:false})
     if (effectiveDeptId) q = q.eq('department_id', effectiveDeptId)
     if (programLevel) q = q.eq('program_level', programLevel)
     const { data: impacts, error } = await q
-    if (error || !impacts?.length) return []
+    if (error) return []
+    // Use all impacts even if empty array — we still need student list
 
     // Fetch student details separately — avoids Supabase nested select issues
     const studentIds = [...new Set(impacts.map(i=>i.student_id).filter(Boolean))]
@@ -1136,7 +1137,8 @@ export default function Reports() {
       doc.text(`Qualifying Postgraduate Students (${impacts.length})`, 14, curY)
       curY += 4
 
-      const studentRows = impacts.map((item,idx) => {
+      const approvedImpacts = impacts.filter(i=>i.status==='approved')
+      const studentRows = approvedImpacts.map((item,idx) => {
         const s    = item.students
         const orcid= s?.student_milestones?.find(m=>m.milestone_id==='orcid')?.status==='completed'
         return [
@@ -1201,38 +1203,61 @@ export default function Reports() {
         curY += 3
       })
 
-      // ── Contact list ──
+
+      // ── Contact list — all students split into two groups ──
       if (curY > pageH-60) { doc.addPage(); curY=20 }
       doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...GMU_NAVY)
       doc.text('Contact List (for ERT Verification)', 14, curY)
       doc.setDrawColor(...GMU_GOLD); doc.line(14,curY+2,pageW-14,curY+2)
-      curY += 6
+      curY += 8
 
-      const contactRows = impacts.map(item => {
-        const s = item.students
-        const orcid = s?.student_milestones?.find(m=>m.milestone_id==='orcid')?.status==='completed'
-        return [
-          s?.name||'—',
-          s?.email||'—',
-          s?.student_id||'—',
-          s?.supervisors?.name||'—',
-          s?.supervisors?.email||'—',
-          orcid ? '✓' : '—',
-        ]
-      })
+      const approvedStudentIds = new Set(approvedImpacts.map(i=>i.student_id))
+      const withImpact    = allStudents.filter(s=>approvedStudentIds.has(s.id))
+      const withoutImpact = allStudents.filter(s=>!approvedStudentIds.has(s.id))
+
+      // Group A — with impact
+      doc.setFillColor(...GMU_NAVY); doc.roundedRect(14,curY-2,pageW-28,8,1,1,'F')
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(255,255,255)
+      doc.text(`GROUP A — Students with Approved Research Impact (${withImpact.length})`, 17, curY+4)
+      curY += 10
 
       doc.autoTable({
         startY: curY,
-        head:[['Student Name','Student Email','Reg No','Supervisor Name','Supervisor Email','ORCID']],
-        body: contactRows,
-        styles:{fontSize:7.5,cellPadding:2.5},
-        headStyles:{fillColor:GMU_NAVY,textColor:[255,255,255],fontStyle:'bold'},
-        columnStyles:{0:{cellWidth:40},1:{cellWidth:60},2:{cellWidth:20},3:{cellWidth:40},4:{cellWidth:60},5:{cellWidth:16}},
+        head:[['Student Name','Email','Reg No','Supervisor','Supervisor Email','ORCID','Impact Types']],
+        body: withImpact.map(s => {
+          const imp   = approvedImpacts.find(i=>i.student_id===s.id)
+          const orcid = s.student_milestones?.find(m=>m.milestone_id==='orcid')?.status==='completed'
+          const sup   = s.supervisors
+          return [s.name||'—',s.email||'—',s.student_id||'—',sup?.name||'—',sup?.email||'—',orcid?'✓':'—',impactTypes(imp||{})]
+        }),
+        styles:{fontSize:7,cellPadding:2},
+        headStyles:{fillColor:[16,185,129],textColor:[255,255,255],fontStyle:'bold',fontSize:7},
+        columnStyles:{0:{cellWidth:34},1:{cellWidth:50},2:{cellWidth:16},3:{cellWidth:30},4:{cellWidth:50},5:{cellWidth:12},6:{cellWidth:44}},
+        alternateRowStyles:{fillColor:[240,253,244]},
+        didParseCell(data){if(data.column.index===5&&data.cell.raw==='✓')data.cell.styles.textColor=[16,185,129]}
+      })
+      curY = doc.lastAutoTable.finalY + 6
+
+      // Group B — without impact
+      if (curY > pageH-40) { doc.addPage(); curY=20 }
+      doc.setFillColor(100,116,139); doc.roundedRect(14,curY-2,pageW-28,8,1,1,'F')
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(255,255,255)
+      doc.text(`GROUP B — Students Without Research Impact Recorded (${withoutImpact.length})`, 17, curY+4)
+      curY += 10
+
+      doc.autoTable({
+        startY: curY,
+        head:[['Student Name','Email','Reg No','Supervisor','Supervisor Email','ORCID']],
+        body: withoutImpact.map(s => {
+          const orcid = s.student_milestones?.find(m=>m.milestone_id==='orcid')?.status==='completed'
+          const sup   = s.supervisors
+          return [s.name||'—',s.email||'—',s.student_id||'—',sup?.name||'—',sup?.email||'—',orcid?'✓':'—']
+        }),
+        styles:{fontSize:7,cellPadding:2},
+        headStyles:{fillColor:[100,116,139],textColor:[255,255,255],fontStyle:'bold',fontSize:7},
+        columnStyles:{0:{cellWidth:40},1:{cellWidth:60},2:{cellWidth:18},3:{cellWidth:36},4:{cellWidth:60},5:{cellWidth:14}},
         alternateRowStyles:{fillColor:[248,249,251]},
-        didParseCell(data){
-          if(data.column.index===5&&data.cell.raw==='✓')
-            data.cell.styles.textColor=[16,185,129]
-        }
+        didParseCell(data){if(data.column.index===5&&data.cell.raw==='✓')data.cell.styles.textColor=[16,185,129]}
       })
 
       // ── Signatures ──
