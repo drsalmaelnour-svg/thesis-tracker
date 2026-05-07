@@ -978,17 +978,65 @@ export default function Reports() {
   async function loadImpactData(programLevel) {
     const { supabase } = await import('../lib/supabase')
     let q = supabase.from('research_impact')
-      .select(`*, students(id,name,email,student_id,enrollment_year,thesis_title,program_level,research_group_id,
-        supervisors(id,name,email,designation),
-        student_milestones(milestone_id,status),
-        research_groups(id,name,thesis_title,irb_number,students(id,name,student_id))
-      )`)
+      .select(`
+        id, student_id, academic_year, program_level, thesis_title, status,
+        has_publication, has_ip, has_industry_partner, has_public_events,
+        has_policy_citation, has_commercialisation, no_impact,
+        supervisor_has_publication, supervisor_has_ip, supervisor_has_industry_partner,
+        supervisor_has_public_events, supervisor_has_policy_citation, supervisor_has_commercialisation,
+        supervisor_confirmed, supervisor_submitted_at, submitted_at,
+        evidence_files, supervisor_evidence_files,
+        industry_partner_name, student_comments, supervisor_comments
+      `)
       .eq('status','approved')
       .order('academic_year',{ascending:false})
     if (effectiveDeptId) q = q.eq('department_id', effectiveDeptId)
     if (programLevel) q = q.eq('program_level', programLevel)
-    const { data } = await q
-    return data || []
+    const { data: impacts, error } = await q
+    if (error || !impacts?.length) return []
+
+    // Fetch student details separately — avoids Supabase nested select issues
+    const studentIds = [...new Set(impacts.map(i=>i.student_id).filter(Boolean))]
+    const { data: students } = await supabase
+      .from('students')
+      .select('id,name,email,student_id,enrollment_year,thesis_title,program_level,research_group_id,department_id,supervisor_id,student_milestones(milestone_id,status)')
+      .in('id', studentIds)
+
+    const { data: supervisors } = await supabase
+      .from('supervisors').select('id,name,email,designation')
+
+    // Build group map
+    const groupIds = [...new Set((students||[]).map(s=>s.research_group_id).filter(Boolean))]
+    let groupMap = {}
+    if (groupIds.length > 0) {
+      const { data: groups } = await supabase
+        .from('research_groups')
+        .select('id,name,thesis_title,irb_number,students(id,name,student_id)')
+        .in('id', groupIds)
+      ;(groups||[]).forEach(g=>{ groupMap[g.id]=g })
+    }
+
+    const studentMap = {}
+    ;(students||[]).forEach(s=>{
+      const sup = (supervisors||[]).find(sv=>sv.id===s.supervisor_id)
+      studentMap[s.id] = {
+        ...s,
+        supervisors: sup || null,
+        research_groups: s.research_group_id ? groupMap[s.research_group_id] : null,
+      }
+    })
+
+    // Parse JSONB fields and attach student data
+    return impacts.map(item => ({
+      ...item,
+      evidence_files: typeof item.evidence_files === 'string'
+        ? JSON.parse(item.evidence_files||'[]')
+        : (item.evidence_files || []),
+      supervisor_evidence_files: typeof item.supervisor_evidence_files === 'string'
+        ? JSON.parse(item.supervisor_evidence_files||'[]')
+        : (item.supervisor_evidence_files || []),
+      students: studentMap[item.student_id] || null,
+    }))
   }
 
   function impactTypes(item) {
@@ -1096,7 +1144,7 @@ export default function Reports() {
           s?.name||'—',
           s?.student_id||'—',
           s?.supervisors?.name||'—',
-          (item.thesis_title||s?.thesis_title||'—').substring(0,38) + ((item.thesis_title||'').length>38?'…':''),
+          (item.thesis_title||s?.thesis_title||'—').substring(0,38) + ((item.thesis_title||s?.thesis_title||'').length>38?'…':''),
           item.academic_year||'—',
           impactTypes(item),
           item.supervisor_confirmed?'✓':'—',
@@ -1162,22 +1210,29 @@ export default function Reports() {
 
       const contactRows = impacts.map(item => {
         const s = item.students
+        const orcid = s?.student_milestones?.find(m=>m.milestone_id==='orcid')?.status==='completed'
         return [
           s?.name||'—',
           s?.email||'—',
+          s?.student_id||'—',
           s?.supervisors?.name||'—',
           s?.supervisors?.email||'—',
+          orcid ? '✓' : '—',
         ]
       })
 
       doc.autoTable({
         startY: curY,
-        head:[['Student Name','Student Email','Supervisor Name','Supervisor Email']],
+        head:[['Student Name','Student Email','Reg No','Supervisor Name','Supervisor Email','ORCID']],
         body: contactRows,
         styles:{fontSize:7.5,cellPadding:2.5},
         headStyles:{fillColor:GMU_NAVY,textColor:[255,255,255],fontStyle:'bold'},
-        columnStyles:{0:{cellWidth:42},1:{cellWidth:52},2:{cellWidth:42},3:{cellWidth:52}},
+        columnStyles:{0:{cellWidth:36},1:{cellWidth:46},2:{cellWidth:16},3:{cellWidth:34},4:{cellWidth:44},5:{cellWidth:12}},
         alternateRowStyles:{fillColor:[248,249,251]},
+        didParseCell(data){
+          if(data.column.index===5&&data.cell.raw==='✓')
+            data.cell.styles.textColor=[16,185,129]
+        }
       })
 
       // ── Signatures ──
@@ -1345,20 +1400,36 @@ export default function Reports() {
       const allContactRows = []
       impacts.forEach(item => {
         const s=item.students; const group=s?.research_groups
+        // For UG: list each member from the group, using the studentMap data
         const members=group?.students||[s]
         members.forEach(m=>{
-          allContactRows.push([m?.name||'—',m?.email||'—',group?.name||'No Group',s?.supervisors?.name||'—',s?.supervisors?.email||'—'])
+          // Find ORCID from student milestones — need to look at the impact's student milestones
+          const memberMilestones = m?.id===s?.id ? s?.student_milestones : []
+          const orcid = memberMilestones?.find(ml=>ml.milestone_id==='orcid')?.status==='completed'
+          allContactRows.push([
+            m?.name||'—',
+            m?.email||s?.email||'—',
+            m?.student_id||'—',
+            group?.name||'No Group',
+            s?.supervisors?.name||'—',
+            s?.supervisors?.email||'—',
+            orcid?'✓':'—',
+          ])
         })
       })
 
       doc.autoTable({
         startY:curY,
-        head:[['Student Name','Student Email','Group','Supervisor','Supervisor Email']],
+        head:[['Student Name','Student Email','Reg No','Group','Supervisor','Supervisor Email','ORCID']],
         body:allContactRows,
-        styles:{fontSize:7.5,cellPadding:2.5},
+        styles:{fontSize:7,cellPadding:2.5},
         headStyles:{fillColor:GMU_NAVY,textColor:[255,255,255],fontStyle:'bold'},
-        columnStyles:{0:{cellWidth:36},1:{cellWidth:46},2:{cellWidth:22},3:{cellWidth:36},4:{cellWidth:48}},
+        columnStyles:{0:{cellWidth:28},1:{cellWidth:40},2:{cellWidth:14},3:{cellWidth:20},4:{cellWidth:28},5:{cellWidth:40},6:{cellWidth:10}},
         alternateRowStyles:{fillColor:[248,249,251]},
+        didParseCell(data){
+          if(data.column.index===6&&data.cell.raw==='✓')
+            data.cell.styles.textColor=[16,185,129]
+        }
       })
 
       // ── Signatures ──
@@ -1408,12 +1479,13 @@ export default function Reports() {
       ws1['!cols']=[{wch:30},{wch:25},{wch:25},{wch:15}]
       XLSX.utils.book_append_sheet(wb, ws1, 'PG Summary')
 
-      const headers=['#','Student Name','Student ID','Supervisor','Thesis Title','Year','Publication','IP','Industry','Events','Policy','Revenue','Sup.Confirmed','ORCID','Evidence Files']
+      const headers=['#','Student Name','Student Email','Student ID','Supervisor','Supervisor Email','Thesis Title','Year','Publication','IP','Industry','Events','Policy','Revenue','Sup.Confirmed','ORCID','Evidence Files']
       const rows = impacts.map((item,i) => {
         const s = item.students
         const orcid = s?.student_milestones?.find(m=>m.milestone_id==='orcid')?.status==='completed'
         const allEvidence=[...(item.evidence_files||[]),...(item.supervisor_evidence_files||[])]
-        return [i+1,s?.name||'—',s?.student_id||'—',s?.supervisors?.name||'—',
+        return [i+1,s?.name||'—',s?.email||'—',s?.student_id||'—',
+          s?.supervisors?.name||'—',s?.supervisors?.email||'—',
           item.thesis_title||s?.thesis_title||'—',item.academic_year||'—',
           item.has_publication||item.supervisor_has_publication?'Yes':'',
           item.has_ip||item.supervisor_has_ip?'Yes':'',
@@ -1424,7 +1496,7 @@ export default function Reports() {
           allEvidence.map(e=>e.fileUrl).join(' | ')]
       })
       const ws2 = XLSX.utils.aoa_to_sheet([headers,...rows])
-      ws2['!cols']=[{wch:5},{wch:25},{wch:15},{wch:25},{wch:45},{wch:12},{wch:12},{wch:8},{wch:12},{wch:10},{wch:10},{wch:10},{wch:15},{wch:10},{wch:60}]
+      ws2['!cols']=[{wch:5},{wch:25},{wch:35},{wch:15},{wch:25},{wch:35},{wch:45},{wch:12},{wch:12},{wch:8},{wch:12},{wch:10},{wch:10},{wch:10},{wch:15},{wch:10},{wch:80}]
       XLSX.utils.book_append_sheet(wb, ws2, 'PG Student Detail')
       XLSX.writeFile(wb, `KPI-4.4-PG-Research-${currentYear}.xlsx`)
     } catch(e) { console.error('KPI 4.4 PG Excel error:', e) }
