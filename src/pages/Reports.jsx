@@ -30,7 +30,11 @@ function getSignatures() {
   }
 }
 
-const SIGNATURE = getSignatures().coordinator
+const getSIGNATURE = () => {
+  try { return getSignatures().coordinator } 
+  catch { return { name: 'Dr. Salma Elnour', title: 'Thesis Coordinator' } }
+}
+const SIGNATURE = getSIGNATURE()
 
 const FIELD_LABELS = {
   orcid_id:         'ORCID iD',
@@ -749,6 +753,14 @@ export default function Reports() {
   const [emailTo,          setEmailTo]          = useState('')
   const [emailSending,     setEmailSending]     = useState(false)
   const [emailResult,      setEmailResult]      = useState(null)
+  const [kpi44PGEmail,     setKpi44PGEmail]     = useState('')
+  const [kpi44UGEmail,     setKpi44UGEmail]     = useState('')
+  const [kpi44PGSending,   setKpi44PGSending]   = useState(false)
+  const [kpi44UGSending,   setKpi44UGSending]   = useState(false)
+  const [kpi44PGMsg,       setKpi44PGMsg]       = useState('')
+  const [kpi44UGMsg,       setKpi44UGMsg]       = useState('')
+  const [kpi44PGFormat,    setKpi44PGFormat]    = useState('pdf')
+  const [kpi44UGFormat,    setKpi44UGFormat]    = useState('pdf')
   const [showEmail,        setShowEmail]        = useState(false)
 
   useEffect(() => {
