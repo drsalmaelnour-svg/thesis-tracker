@@ -257,6 +257,14 @@ export default function Students() {
             {bulkApplying?<Loader2 size={13} className="animate-spin"/>:<CheckSquare size={13}/>}
             {bulkApplying?'Applying…':'Apply'}
           </button>
+          <button onClick={async()=>{
+            if(!confirm(`Delete ${selected.length} student${selected.length!==1?'s':''}? This cannot be undone.`)) return
+            const { supabase } = await import('../lib/supabase')
+            await supabase.from('students').delete().in('id', selected)
+            setSelected([]); load()
+          }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/25 transition-all">
+            🗑 Delete Selected
+          </button>
           <button onClick={()=>setSelected([])} className="btn-ghost py-1.5 text-xs">Clear</button>
         </div>
       )}
