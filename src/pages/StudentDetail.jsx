@@ -477,12 +477,29 @@ export default function StudentDetail() {
               <h3 className="font-semibold text-slate-100 mb-1">Research Impact Survey</h3>
               <p className="text-xs text-navy-400 mb-4">
                 Send {student?.name} a link to declare their research impact for KPI 4.4.
-                They will complete the form and upload evidence directly to Google Drive.
+                You can send to the student, supervisor, or both — supervisor can submit before the student.
               </p>
-              <button onClick={sendImpactSurvey} disabled={sendingImpact || !student?.email}
-                className="btn-primary text-sm disabled:opacity-50 flex items-center gap-2">
-                {sendingImpact ? <><Loader2 size={14} className="animate-spin"/>Sending…</> : '📧 Send Research Impact Survey'}
-              </button>
+              <div className="flex gap-2 flex-wrap">
+                <button onClick={sendImpactSurvey} disabled={sendingImpact || !student?.email}
+                  className="btn-primary text-sm disabled:opacity-50 flex items-center gap-2">
+                  {sendingImpact ? <><Loader2 size={14} className="animate-spin"/>Sending…</> : '📧 Send to Student'}
+                </button>
+                {student?.supervisors?.email && (
+                  <button onClick={async () => {
+                    setSendingImpact(true); setImpactMsg('')
+                    try {
+                      const { sendSupervisorImpactEmail } = await import('../lib/emailService')
+                      const appUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '')
+                      const result = await sendSupervisorImpactEmail(student, student.supervisors, appUrl)
+                      setImpactMsg(result.ok ? '✓ Sent to supervisor' : 'Failed: ' + result.message)
+                    } catch(e) { setImpactMsg('Error: ' + e.message) }
+                    setSendingImpact(false)
+                  }} disabled={sendingImpact}
+                    className="btn-secondary text-sm disabled:opacity-50 flex items-center gap-2">
+                    {sendingImpact ? <><Loader2 size={14} className="animate-spin"/>Sending…</> : '📧 Send to Supervisor'}
+                  </button>
+                )}
+              </div>
               {impactMsg && <p className="text-xs mt-3 text-emerald-400 break-all">{impactMsg}</p>}
               {!student?.email && <p className="text-xs mt-2 text-amber-400">⚠ No email address on file.</p>}
             </div>
