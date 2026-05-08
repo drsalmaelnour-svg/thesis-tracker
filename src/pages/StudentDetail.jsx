@@ -116,7 +116,29 @@ export default function StudentDetail() {
     setSendingImpact(false)
   }
 
-  async function updateImpactStatus(status, notes) {
+  async function sendToSupervisor() {
+    if (!student?.supervisors?.email) return
+    setSendingImpact(true); setImpactMsg('')
+    try {
+      const { supabase } = await import('../lib/supabase')
+
+      // Auto-generate tokens if missing
+      let currentStudent = student
+      if (!student.impact_token || !student.supervisor_impact_token) {
+        const impact_token            = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b=>b.toString(16).padStart(2,'0')).join('')
+        const supervisor_impact_token = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b=>b.toString(16).padStart(2,'0')).join('')
+        await supabase.from('students').update({ impact_token, supervisor_impact_token }).eq('id', student.id)
+        currentStudent = { ...student, impact_token, supervisor_impact_token }
+        await load()
+      }
+
+      const appUrl = 'https://drsalmaelnour-svg.github.io/thesis-tracker'
+      const { sendSupervisorImpactEmail } = await import('../lib/emailService')
+      const result = await sendSupervisorImpactEmail(currentStudent, currentStudent.supervisors, appUrl)
+      setImpactMsg(result.ok ? '✓ Sent to supervisor' : 'Failed: ' + (result?.message || 'Unknown error'))
+    } catch(e) { setImpactMsg('Error: ' + e.message) }
+    setSendingImpact(false)
+  }
     if (!impact) return
     try {
       const { supabase } = await import('../lib/supabase')
@@ -535,16 +557,7 @@ export default function StudentDetail() {
                   {sendingImpact ? <><Loader2 size={14} className="animate-spin"/>Sending…</> : '📧 Send to Student'}
                 </button>
                 {student?.supervisors?.email && (
-                  <button onClick={async () => {
-                    setSendingImpact(true); setImpactMsg('')
-                    try {
-                      const { sendSupervisorImpactEmail } = await import('../lib/emailService')
-                      const appUrl = 'https://drsalmaelnour-svg.github.io/thesis-tracker'
-                      const result = await sendSupervisorImpactEmail(student, student.supervisors, appUrl)
-                      setImpactMsg(result.ok ? '✓ Sent to supervisor' : 'Failed: ' + result.message)
-                    } catch(e) { setImpactMsg('Error: ' + e.message) }
-                    setSendingImpact(false)
-                  }} disabled={sendingImpact}
+                  <button onClick={sendToSupervisor} disabled={sendingImpact}
                     className="btn-secondary text-sm disabled:opacity-50 flex items-center gap-2">
                     {sendingImpact ? <><Loader2 size={14} className="animate-spin"/>Sending…</> : '📧 Send to Supervisor'}
                   </button>
@@ -762,16 +775,8 @@ export default function StudentDetail() {
                   {sendingImpact?'Sending…':'↺ Resend survey to student'}
                 </button>
                 {student?.supervisors?.email && (
-                  <button onClick={async () => {
-                    setSendingImpact(true); setImpactMsg('')
-                    try {
-                      const { sendSupervisorImpactEmail } = await import('../lib/emailService')
-                      const appUrl = 'https://drsalmaelnour-svg.github.io/thesis-tracker'
-                      const result = await sendSupervisorImpactEmail(student, student.supervisors, appUrl)
-                      setImpactMsg(result.ok ? '✓ Confirmation request sent to supervisor' : 'Failed: ' + result.message)
-                    } catch(e) { setImpactMsg('Error: ' + e.message) }
-                    setSendingImpact(false)
-                  }} disabled={sendingImpact} className="text-xs text-navy-500 hover:text-navy-300 transition-colors ml-4">
+                  <button onClick={sendToSupervisor} disabled={sendingImpact}
+                    className="text-xs text-navy-500 hover:text-navy-300 transition-colors ml-4">
                     📧 Send to Supervisor
                   </button>
                 )}
