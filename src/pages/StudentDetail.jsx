@@ -92,13 +92,25 @@ export default function StudentDetail() {
     if (!student) return
     setSendingImpact(true); setImpactMsg('')
     try {
+      const { supabase } = await import('../lib/supabase')
+
+      // Auto-generate tokens if missing — fixes students added manually
+      let currentStudent = student
+      if (!student.impact_token || !student.supervisor_impact_token) {
+        const impact_token            = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b=>b.toString(16).padStart(2,'0')).join('')
+        const supervisor_impact_token = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b=>b.toString(16).padStart(2,'0')).join('')
+        await supabase.from('students').update({ impact_token, supervisor_impact_token }).eq('id', student.id)
+        currentStudent = { ...student, impact_token, supervisor_impact_token }
+        await load()
+      }
+
+      const appUrl = 'https://drsalmaelnour-svg.github.io/thesis-tracker'
       const { sendResearchImpactEmail } = await import('../lib/emailService')
-      const appUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '')
-      const result = await sendResearchImpactEmail(student, appUrl)
+      const result = await sendResearchImpactEmail(currentStudent, appUrl)
       if (result.ok) {
         setImpactMsg('✓ Survey email sent to ' + student.email)
       } else {
-        setImpactMsg('Email failed — Survey link: ' + appUrl + '/#/research-impact?t=' + student.impact_token)
+        setImpactMsg('Failed: ' + (result?.message || 'Unknown error'))
       }
     } catch(e) { setImpactMsg('Error: ' + e.message) }
     setSendingImpact(false)
@@ -527,7 +539,7 @@ export default function StudentDetail() {
                     setSendingImpact(true); setImpactMsg('')
                     try {
                       const { sendSupervisorImpactEmail } = await import('../lib/emailService')
-                      const appUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '')
+                      const appUrl = 'https://drsalmaelnour-svg.github.io/thesis-tracker'
                       const result = await sendSupervisorImpactEmail(student, student.supervisors, appUrl)
                       setImpactMsg(result.ok ? '✓ Sent to supervisor' : 'Failed: ' + result.message)
                     } catch(e) { setImpactMsg('Error: ' + e.message) }
@@ -754,7 +766,7 @@ export default function StudentDetail() {
                     setSendingImpact(true); setImpactMsg('')
                     try {
                       const { sendSupervisorImpactEmail } = await import('../lib/emailService')
-                      const appUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '')
+                      const appUrl = 'https://drsalmaelnour-svg.github.io/thesis-tracker'
                       const result = await sendSupervisorImpactEmail(student, student.supervisors, appUrl)
                       setImpactMsg(result.ok ? '✓ Confirmation request sent to supervisor' : 'Failed: ' + result.message)
                     } catch(e) { setImpactMsg('Error: ' + e.message) }

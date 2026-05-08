@@ -86,10 +86,12 @@ export default function AddStudentModal({ onClose, onSuccess, student: existing 
         if (uErr) throw uErr
       } else {
         // Insert new student
-        const token = crypto.randomUUID()
+        const token                  = crypto.randomUUID()
+        const impact_token           = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b=>b.toString(16).padStart(2,'0')).join('')
+        const supervisor_impact_token= Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b=>b.toString(16).padStart(2,'0')).join('')
         const { data: student, error: sErr } = await supabase
           .from('students')
-          .insert({ ...form, token })
+          .insert({ ...form, token, impact_token, supervisor_impact_token })
           .select()
           .single()
         if (sErr) throw sErr
