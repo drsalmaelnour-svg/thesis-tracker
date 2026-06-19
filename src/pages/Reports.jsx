@@ -4,7 +4,7 @@ import {
   FileText, Download, Printer, FileSpreadsheet, Loader2,
   Filter, ChevronDown, RefreshCw, Mail, Send
 } from 'lucide-react'
-import { getStudentsWithProgress, getSupervisorCheckins, MILESTONES } from '../lib/supabase'
+import { getStudentsWithProgress, getSupervisorCheckins, MILESTONES, getSupervisors, getExternalExaminers, getAssessmentAssignments } from '../lib/supabase'
 import { sendStudentEmail } from '../lib/emailService'
 import { getSession } from '../lib/auth'
 
@@ -761,6 +761,11 @@ export default function Reports() {
   const [kpi44UGMsg,       setKpi44UGMsg]       = useState('')
   const [kpi44PGFormat,    setKpi44PGFormat]    = useState('pdf')
   const [kpi44UGFormat,    setKpi44UGFormat]    = useState('pdf')
+  const [examinerEmail,    setExaminerEmail]    = useState('')
+  const [examinerSending,  setExaminerSending]  = useState(false)
+  const [examinerMsg,      setExaminerMsg]      = useState('')
+  const [examinerFormat,   setExaminerFormat]   = useState('pdf')
+  const [examinerReportType, setExaminerReportType] = useState('directory') // 'directory' | 'assignments'
   const [showEmail,        setShowEmail]        = useState(false)
 
   useEffect(() => {
@@ -1595,6 +1600,221 @@ export default function Reports() {
     setSending(false)
   }
 
+  // ── Examiner Data Loading ────────────────────────────────────────────────────
+  async function loadExaminerData() {
+    const [supervisors, externals, assignments] = await Promise.all([
+      getSupervisors(),
+      getExternalExaminers(),
+      getAssessmentAssignments(),
+    ])
+
+    // Build unified examiner directory — internal (supervisors who examine) + external
+    const internalExaminerIds = new Set(
+      assignments.filter(a => a.examiner_type === 'internal' && a.examiner_id).map(a => a.examiner_id)
+    )
+    const internalExaminers = supervisors
+      .filter(s => internalExaminerIds.has(s.id))
+      .map(s => ({
+        id: s.id, name: s.name, email: s.email,
+        designation: s.designation || '—', institution: 'Gulf Medical University',
+        type: 'Internal',
+      }))
+    const externalExaminers = externals.map(e => ({
+      id: e.id, name: e.name, email: e.email,
+      designation: e.designation || '—', institution: e.institution || '—',
+      type: 'External',
+    }))
+
+    const directory = [...internalExaminers, ...externalExaminers].sort((a,b) => a.name.localeCompare(b.name))
+
+    // Build assignment list — one row per examiner per student per assessment type
+    const assignmentRows = assignments.map(a => {
+      const examinerName  = a.examiner_type === 'external' ? (a.external_examiners?.name  || '—') : (supervisors.find(s=>s.id===a.examiner_id)?.name  || '—')
+      const examinerEmail = a.examiner_type === 'external' ? (a.external_examiners?.email || '—') : (supervisors.find(s=>s.id===a.examiner_id)?.email || '—')
+      return {
+        examinerName, examinerEmail,
+        examinerType: a.examiner_type === 'external' ? 'External' : 'Internal',
+        studentName: a.students?.name || '—',
+        studentId:   a.students?.student_id || '—',
+        assessmentType: (a.assessment_type||'').replace(/_/g,' ').replace(/\b\w/g, c=>c.toUpperCase()),
+        examinerNumber: a.examiner_number,
+        assignedAt: a.assigned_at ? new Date(a.assigned_at).toLocaleDateString('en-GB') : '—',
+      }
+    }).sort((a,b) => a.examinerName.localeCompare(b.examinerName))
+
+    return { directory, assignmentRows }
+  }
+
+  // ── Examiner Directory PDF ──────────────────────────────────────────────────
+  async function generateExaminerDirectoryPDF() {
+    try {
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js')
+      const jsPDF = window.jspdf?.jsPDF || window.jsPDF
+      if (!jsPDF) throw new Error('PDF library failed to load')
+
+      const { directory } = await loadExaminerData()
+      const sigs = getSignatures()
+      const dept = session?.department?.name || 'College of Health Sciences'
+
+      const doc   = new jsPDF({orientation:'landscape',unit:'mm',format:'a4'})
+      const pageW = doc.internal.pageSize.getWidth()
+      const pageH = doc.internal.pageSize.getHeight()
+
+      doc.setFillColor(...GMU_NAVY); doc.rect(0,0,pageW,28,'F')
+      doc.setFillColor(...GMU_GOLD); doc.rect(0,26,pageW,2,'F')
+      doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(255,255,255)
+      doc.text('Examiner Directory', pageW/2, 12, {align:'center'})
+      doc.setFont('helvetica','normal'); doc.setFontSize(8.5)
+      doc.text('Internal and External Examiners — Full Contact List', pageW/2, 20, {align:'center'})
+
+      doc.setTextColor(...GMU_NAVY); doc.setFontSize(9)
+      doc.text(`Department: ${dept}`, 14, 36)
+      doc.text(`Report Date: ${new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'})}`, 14, 41)
+      doc.text(`Total Examiners: ${directory.length}  (Internal: ${directory.filter(d=>d.type==='Internal').length}  External: ${directory.filter(d=>d.type==='External').length})`, 14, 46)
+
+      doc.autoTable({
+        startY: 54,
+        head: [['#','Name','Type','Designation','Institution','Email']],
+        body: directory.map((d,i)=>[i+1, d.name, d.type, d.designation, d.institution, d.email]),
+        styles:{fontSize:8,cellPadding:3},
+        headStyles:{fillColor:GMU_NAVY,textColor:[255,255,255],fontStyle:'bold'},
+        columnStyles:{0:{cellWidth:10},1:{cellWidth:50},2:{cellWidth:25},3:{cellWidth:45},4:{cellWidth:65},5:{cellWidth:75}},
+        alternateRowStyles:{fillColor:[248,249,251]},
+        didParseCell(data){
+          if(data.column.index===2){
+            if(data.cell.raw==='Internal') data.cell.styles.textColor=[16,107,184]
+            if(data.cell.raw==='External') data.cell.styles.textColor=[124,58,237]
+          }
+        }
+      })
+
+      let curY = doc.lastAutoTable.finalY + 16
+      if (curY > pageH-35) { doc.addPage(); curY=20 }
+      doc.setDrawColor(...GMU_GOLD); doc.setLineWidth(0.8); doc.line(14,curY,84,curY)
+      doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...GMU_NAVY)
+      doc.text(sigs.coordinator.name,14,curY+6)
+      doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(100,100,100)
+      doc.text(sigs.coordinator.title,14,curY+11)
+      doc.text('Gulf Medical University',14,curY+16)
+
+      doc.save(`Examiner-Directory-${new Date().toISOString().slice(0,10)}.pdf`)
+    } catch(e) { console.error('Examiner directory PDF error:', e); examinerErrorAlert(e) }
+  }
+
+  // ── Examiner Assignment Report PDF ──────────────────────────────────────────
+  async function generateExaminerAssignmentsPDF() {
+    try {
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js')
+      const jsPDF = window.jspdf?.jsPDF || window.jsPDF
+      if (!jsPDF) throw new Error('PDF library failed to load')
+
+      const { assignmentRows } = await loadExaminerData()
+      const sigs = getSignatures()
+      const dept = session?.department?.name || 'College of Health Sciences'
+
+      const doc   = new jsPDF({orientation:'landscape',unit:'mm',format:'a4'})
+      const pageW = doc.internal.pageSize.getWidth()
+      const pageH = doc.internal.pageSize.getHeight()
+
+      doc.setFillColor(...GMU_NAVY); doc.rect(0,0,pageW,28,'F')
+      doc.setFillColor(...GMU_GOLD); doc.rect(0,26,pageW,2,'F')
+      doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(255,255,255)
+      doc.text('Examiner Assignment Report', pageW/2, 12, {align:'center'})
+      doc.setFont('helvetica','normal'); doc.setFontSize(8.5)
+      doc.text('Student Assignments by Examiner and Assessment Type', pageW/2, 20, {align:'center'})
+
+      doc.setTextColor(...GMU_NAVY); doc.setFontSize(9)
+      doc.text(`Department: ${dept}`, 14, 36)
+      doc.text(`Report Date: ${new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'})}`, 14, 41)
+      doc.text(`Total Assignments: ${assignmentRows.length}`, 14, 46)
+
+      doc.autoTable({
+        startY: 54,
+        head: [['#','Examiner','Type','Student','Reg No','Assessment','Exam #','Assigned']],
+        body: assignmentRows.map((r,i)=>[i+1, r.examinerName, r.examinerType, r.studentName, r.studentId, r.assessmentType, r.examinerNumber, r.assignedAt]),
+        styles:{fontSize:8,cellPadding:3},
+        headStyles:{fillColor:GMU_NAVY,textColor:[255,255,255],fontStyle:'bold'},
+        columnStyles:{0:{cellWidth:10},1:{cellWidth:48},2:{cellWidth:22},3:{cellWidth:48},4:{cellWidth:24},5:{cellWidth:40},6:{cellWidth:18},7:{cellWidth:26}},
+        alternateRowStyles:{fillColor:[248,249,251]},
+        didParseCell(data){
+          if(data.column.index===2){
+            if(data.cell.raw==='Internal') data.cell.styles.textColor=[16,107,184]
+            if(data.cell.raw==='External') data.cell.styles.textColor=[124,58,237]
+          }
+        }
+      })
+
+      let curY = doc.lastAutoTable.finalY + 16
+      if (curY > pageH-35) { doc.addPage(); curY=20 }
+      doc.setDrawColor(...GMU_GOLD); doc.setLineWidth(0.8); doc.line(14,curY,84,curY)
+      doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...GMU_NAVY)
+      doc.text(sigs.coordinator.name,14,curY+6)
+      doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(100,100,100)
+      doc.text(sigs.coordinator.title,14,curY+11)
+      doc.text('Gulf Medical University',14,curY+16)
+
+      doc.save(`Examiner-Assignments-${new Date().toISOString().slice(0,10)}.pdf`)
+    } catch(e) { console.error('Examiner assignments PDF error:', e); examinerErrorAlert(e) }
+  }
+
+  // ── Examiner Excel (both sheets) ────────────────────────────────────────────
+  async function generateExaminerExcel() {
+    try {
+      const { directory, assignmentRows } = await loadExaminerData()
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js')
+      const XLSX = window.XLSX; const wb = XLSX.utils.book_new()
+
+      const ws1 = XLSX.utils.aoa_to_sheet([
+        ['Examiner Directory'],
+        ['Department', session?.department?.name||''],
+        ['Report Date', new Date().toLocaleDateString('en-GB')],
+        ['Total Examiners', directory.length],
+        [],
+        ['#','Name','Type','Designation','Institution','Email'],
+        ...directory.map((d,i)=>[i+1,d.name,d.type,d.designation,d.institution,d.email]),
+      ])
+      ws1['!cols']=[{wch:5},{wch:25},{wch:12},{wch:25},{wch:30},{wch:35}]
+      XLSX.utils.book_append_sheet(wb, ws1, 'Examiner Directory')
+
+      const ws2 = XLSX.utils.aoa_to_sheet([
+        ['Examiner Assignment Report'],
+        ['Department', session?.department?.name||''],
+        ['Report Date', new Date().toLocaleDateString('en-GB')],
+        ['Total Assignments', assignmentRows.length],
+        [],
+        ['#','Examiner','Email','Type','Student','Reg No','Assessment Type','Examiner #','Assigned Date'],
+        ...assignmentRows.map((r,i)=>[i+1,r.examinerName,r.examinerEmail,r.examinerType,r.studentName,r.studentId,r.assessmentType,r.examinerNumber,r.assignedAt]),
+      ])
+      ws2['!cols']=[{wch:5},{wch:25},{wch:30},{wch:12},{wch:25},{wch:15},{wch:22},{wch:12},{wch:15}]
+      XLSX.utils.book_append_sheet(wb, ws2, 'Assignments')
+
+      XLSX.writeFile(wb, `Examiner-Report-${new Date().toISOString().slice(0,10)}.xlsx`)
+    } catch(e) { console.error('Examiner Excel error:', e); examinerErrorAlert(e) }
+  }
+
+  function examinerErrorAlert(e) {
+    setExaminerMsg('Error: ' + (e?.message || 'Failed to generate report'))
+  }
+
+  // ── Examiner Email ───────────────────────────────────────────────────────────
+  async function emailExaminerReport(emailTo, reportType) {
+    setExaminerSending(true); setExaminerMsg('')
+    try {
+      const appUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '')
+      const label = reportType === 'directory' ? 'Examiner Directory' : 'Examiner Assignment Report'
+      const result = await sendStudentEmail({
+        student: { name: emailTo.split('@')[0], email: emailTo, token: '' },
+        milestoneId: null,
+        subject: `${label} — ${new Date().toLocaleDateString('en-GB')}`,
+        message: `Please find the ${label}.\n\nDownload from: ${appUrl}/#/reports`,
+      })
+      if (result?.ok !== false) { setExaminerMsg('✓ Email sent to ' + emailTo) }
+      else { setExaminerMsg('Failed: ' + (result?.message||'Unknown error')) }
+    } catch(e) { setExaminerMsg('Error: ' + e.message) }
+    setExaminerSending(false)
+  }
 
 
   return (
@@ -1847,6 +2067,77 @@ export default function Reports() {
                 className="btn-primary text-sm flex items-center gap-2">
                 <FileText size={14}/>{kpi44UGFormat==='pdf'?'Download UG PDF':'Download UG Excel'}
               </button>
+            )}
+          </div>
+
+          {/* ── Examiner Reports ── */}
+          <div className="card p-5 space-y-4" style={{border:'1px solid rgba(124,58,237,0.25)'}}>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center shrink-0 text-lg">👨‍🏫</div>
+              <div>
+                <h3 className="font-semibold text-slate-100 text-sm">Examiner Reports</h3>
+                <p className="text-xs text-navy-400">Internal + external examiners · directory and assignments</p>
+              </div>
+            </div>
+
+            {/* Report type toggle */}
+            <div className="flex gap-2">
+              {[{v:'directory',label:'📇 Directory'},{v:'assignments',label:'📋 Assignments'}].map(t => (
+                <button key={t.v} onClick={()=>setExaminerReportType(t.v)}
+                  className="flex-1 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
+                  style={examinerReportType===t.v?{background:'#7C3AED',color:'#fff'}:{background:'rgba(255,255,255,0.05)',color:'rgba(148,163,184,0.8)',border:'1px solid rgba(255,255,255,0.1)'}}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            <p className="text-xs text-navy-500">
+              {examinerReportType==='directory'
+                ? 'Full contact list of all examiners who have been assigned to at least one student, plus all registered external examiners.'
+                : 'Every examiner-student-assessment assignment, showing who is examining whom and when they were assigned.'}
+            </p>
+
+            {/* Format toggle */}
+            <div className="flex gap-2">
+              {['pdf','excel','email'].map(fmt => (
+                <button key={fmt} onClick={()=>setExaminerFormat(fmt)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all capitalize"
+                  style={examinerFormat===fmt?{background:'#7C3AED',color:'#fff'}:{background:'rgba(255,255,255,0.05)',color:'rgba(148,163,184,0.8)',border:'1px solid rgba(255,255,255,0.1)'}}>
+                  {fmt==='pdf'?'📄 PDF':fmt==='excel'?'📊 Excel':'📧 Email'}
+                </button>
+              ))}
+            </div>
+
+            {examinerFormat==='email'?(
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input className="input flex-1 text-sm" type="email" placeholder="recipient@gmu.ac.ae"
+                    value={examinerEmail} onChange={e=>setExaminerEmail(e.target.value)}/>
+                  <button onClick={()=>examinerEmail&&emailExaminerReport(examinerEmail, examinerReportType)}
+                    disabled={examinerSending||!examinerEmail} className="btn-primary text-sm disabled:opacity-50"
+                    style={{background:'#7C3AED'}}>
+                    {examinerSending?<Loader2 size={13} className="animate-spin"/>:'Send'}
+                  </button>
+                </div>
+                {examinerMsg&&<p className={`text-xs ${examinerMsg.startsWith('✓')?'text-emerald-400':'text-red-400'}`}>{examinerMsg}</p>}
+              </div>
+            ):(
+              <button
+                onClick={
+                  examinerFormat==='pdf'
+                    ? (examinerReportType==='directory' ? generateExaminerDirectoryPDF : generateExaminerAssignmentsPDF)
+                    : generateExaminerExcel
+                }
+                className="text-sm flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-white transition-all"
+                style={{background:'#7C3AED'}}>
+                <FileText size={14}/>
+                {examinerFormat==='pdf'
+                  ? `Download ${examinerReportType==='directory'?'Directory':'Assignments'} PDF`
+                  : 'Download Excel (both sheets)'}
+              </button>
+            )}
+            {examinerMsg && examinerFormat!=='email' && (
+              <p className="text-xs text-red-400">{examinerMsg}</p>
             )}
           </div>
 
