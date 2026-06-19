@@ -139,6 +139,8 @@ export default function StudentDetail() {
     } catch(e) { setImpactMsg('Error: ' + e.message) }
     setSendingImpact(false)
   }
+
+  async function updateImpactStatus(status, notes) {
     if (!impact) return
     try {
       const { supabase } = await import('../lib/supabase')
