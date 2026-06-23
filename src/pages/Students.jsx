@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useDept } from '../context/DeptContext'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { UserPlus, Search, Mail, ArrowRight, Upload, Edit2, CheckSquare, Square, ChevronDown, Loader2 } from 'lucide-react'
 import { getStudentsWithProgress, updateMilestoneStatus, MILESTONES, logActivity } from '../lib/supabase'
 import { MilestoneBar } from '../components/MilestoneProgress'
@@ -17,10 +17,15 @@ const STATUS_LABELS = {
 
 export default function Students() {
   const { effectiveDeptId, effectiveProgLevel, viewingDept, viewingLevel } = useDept() || {}
+  const location = useLocation()
   const [students, setStudents] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
+  const [cohortFilter, setCohortFilter] = useState(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('cohort') || 'all'
+  })
   const [showAdd, setShowAdd] = useState(false)
   const [showImport, setShowImport] = useState(false)
   const [editStudent, setEditStudent] = useState(null)
@@ -69,7 +74,9 @@ export default function Students() {
       filter === 'complete' ? milestones.filter(m => m.status === 'completed').length === MILESTONES.length :
       filter === 'on_track' ? !milestones.some(m => m.status === 'overdue') : true
 
-    return matchesSearch && matchesFilter
+    const matchesCohort = cohortFilter === 'all' || String(s.enrollment_year) === String(cohortFilter)
+
+    return matchesSearch && matchesFilter && matchesCohort
   })
 
   return (
@@ -91,7 +98,7 @@ export default function Students() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 max-w-sm">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-navy-400" />
           <input
@@ -101,6 +108,15 @@ export default function Students() {
             onChange={e => setSearch(e.target.value)}
           />
         </div>
+
+        {/* Cohort year filter */}
+        <select className="input text-sm w-40"
+          value={cohortFilter} onChange={e => setCohortFilter(e.target.value)}>
+          <option value="all">All Cohorts</option>
+          {[...new Set(students.map(s=>s.enrollment_year).filter(Boolean))].sort((a,b)=>b-a)
+            .map(y => <option key={y} value={y}>{y} Cohort</option>)}
+        </select>
+
         <div className="flex gap-1">
           {Object.entries(STATUS_LABELS).map(([k, label]) => (
             <button
@@ -116,6 +132,12 @@ export default function Students() {
             </button>
           ))}
         </div>
+        {cohortFilter !== 'all' && (
+          <button onClick={() => setCohortFilter('all')}
+            className="text-xs text-navy-400 hover:text-navy-200 transition-colors">
+            ✕ Clear cohort
+          </button>
+        )}
       </div>
 
       {/* Table */}
