@@ -157,3 +157,127 @@
 [data-theme="light"] aside {
   background: rgba(30, 58, 95, 0.97) !important;
 }
+
+/* ── Light Mode Global Overrides ──────────────────────────────────────── */
+[data-theme="light"] body {
+  background-color: #f1f5f9 !important;
+  background-image:
+    radial-gradient(ellipse at 20% 0%, rgba(212,168,67,0.08) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 100%, rgba(30,58,95,0.05) 0%, transparent 60%);
+  color: #0f1f36 !important;
+}
+
+/* Main content area */
+[data-theme="light"] main,
+[data-theme="light"] .main-content {
+  background: transparent !important;
+}
+
+/* Cards */
+[data-theme="light"] .card,
+[data-theme="light"] [class*="bg-navy-9"],
+[data-theme="light"] [class*="bg-navy-8"] {
+  background: rgba(255,255,255,0.92) !important;
+  border-color: rgba(203,213,225,0.8) !important;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.06) !important;
+}
+
+/* Navy text → dark text */
+[data-theme="light"] [class*="text-navy-4"],
+[data-theme="light"] [class*="text-navy-5"],
+[data-theme="light"] [class*="text-navy-6"] {
+  color: #475569 !important;
+}
+[data-theme="light"] [class*="text-navy-3"] {
+  color: #334155 !important;
+}
+
+/* Slate text */
+[data-theme="light"] [class*="text-slate-1"],
+[data-theme="light"] [class*="text-slate-2"] {
+  color: #0f1f36 !important;
+}
+[data-theme="light"] [class*="text-slate-3"],
+[data-theme="light"] [class*="text-slate-4"] {
+  color: #334155 !important;
+}
+[data-theme="light"] [class*="text-slate-5"],
+[data-theme="light"] [class*="text-slate-6"] {
+  color: #64748b !important;
+}
+
+/* Inputs */
+[data-theme="light"] .input,
+[data-theme="light"] input,
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  background: #ffffff !important;
+  border-color: rgba(148,163,184,0.6) !important;
+  color: #0f1f36 !important;
+}
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Navy bg elements (panels, rows) */
+[data-theme="light"] [class*="bg-navy-7"] {
+  background: rgba(241,245,249,0.9) !important;
+  border-color: rgba(203,213,225,0.6) !important;
+}
+
+/* Table alternating rows */
+[data-theme="light"] [class*="bg-navy-800/30"],
+[data-theme="light"] [class*="bg-navy-800/40"] {
+  background: rgba(241,245,249,0.7) !important;
+}
+
+/* Borders */
+[data-theme="light"] [class*="border-navy-7"] {
+  border-color: rgba(203,213,225,0.8) !important;
+}
+[data-theme="light"] [class*="border-navy-6"] {
+  border-color: rgba(203,213,225,0.6) !important;
+}
+
+/* Milestone progress bar track */
+[data-theme="light"] [class*="bg-navy-800/20"],
+[data-theme="light"] [class*="bg-navy-900/20"] {
+  background: rgba(203,213,225,0.4) !important;
+}
+
+/* Hover states */
+[data-theme="light"] .btn-ghost:hover {
+  background: rgba(30,58,95,0.08) !important;
+  color: #1e3a5f !important;
+}
+
+/* Gold text stays gold */
+[data-theme="light"] [class*="text-gold"] {
+  color: #b8860b !important;
+}
+
+/* Emerald / red / amber status colours — keep as is */
+[data-theme="light"] [class*="text-emerald"],
+[data-theme="light"] [class*="text-red"],
+[data-theme="light"] [class*="text-amber"] {
+  /* keep original */
+}
+
+/* Backdrop blur panels */
+[data-theme="light"] [class*="backdrop-blur"] {
+  background: rgba(255,255,255,0.85) !important;
+}
+
+/* Login page */
+[data-theme="light"] .login-bg {
+  background: linear-gradient(135deg, #e2e8f0 0%, #f1f5f9 100%) !important;
+}
+
+/* Scrollbar */
+[data-theme="light"] ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: #cbd5e1 !important;
+}
