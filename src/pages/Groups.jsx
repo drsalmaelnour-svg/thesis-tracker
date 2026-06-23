@@ -84,6 +84,27 @@ async function deleteStudents(ids) {
   if (error) throw error
 }
 
+async function createGroup(deptId, data) {
+  const { supabase } = await import('../lib/supabase')
+  const clean = Object.fromEntries(
+    Object.entries(data).map(([k,v]) => [k, v===''?null:v])
+  )
+  const { data: group, error } = await supabase
+    .from('research_groups')
+    .insert({ ...clean, department_id: deptId, program_level: 'Undergraduate', active: true })
+    .select('id').single()
+  if (error) throw error
+  return group
+}
+
+async function deleteGroup(id) {
+  const { supabase } = await import('../lib/supabase')
+  // Unlink students first
+  await supabase.from('students').update({ research_group_id: null }).eq('research_group_id', id)
+  const { error } = await supabase.from('research_groups').delete().eq('id', id)
+  if (error) throw error
+}
+
 export default function Groups() {
   const { effectiveDeptId, viewingDept, viewingLevel } = useDept() || {}
   const { can }      = useRole() || {}
@@ -104,6 +125,13 @@ export default function Groups() {
   const [studentForm,   setStudentForm]    = useState({})
   const [selected,    setSelected]    = useState(new Set())
   const [deleting,    setDeleting]    = useState(false)
+  const [showCreate,  setShowCreate]  = useState(false)
+  const [createForm,  setCreateForm]  = useState({
+    name: '', academic_year: new Date().getFullYear(), research_area: '',
+    proposal_title: '', supervisor_id: '', notes: ''
+  })
+  const [creating,    setCreating]    = useState(false)
+  const [createMsg,   setCreateMsg]   = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -158,6 +186,30 @@ export default function Groups() {
       await load()
     } catch(e) { alert('Delete failed: ' + e.message) }
     setDeleting(false)
+  }
+
+  async function handleCreateGroup() {
+    if (!createForm.name.trim()) { setCreateMsg('Group name is required.'); return }
+    setCreating(true); setCreateMsg('')
+    try {
+      await createGroup(effectiveDeptId, createForm)
+      setShowCreate(false)
+      setCreateForm({ name:'', academic_year:new Date().getFullYear(), research_area:'', proposal_title:'', supervisor_id:'', notes:'' })
+      await load()
+    } catch(e) { setCreateMsg('Error: ' + e.message) }
+    setCreating(false)
+  }
+
+  async function handleDeleteGroup(group) {
+    const memberCount = group.students?.length || 0
+    const msg = memberCount > 0
+      ? `Delete group "${group.name}"? This will unlink ${memberCount} student${memberCount>1?'s':''} from the group (students will not be deleted). This cannot be undone.`
+      : `Delete group "${group.name}"? This cannot be undone.`
+    if (!confirm(msg)) return
+    try {
+      await deleteGroup(group.id)
+      await load()
+    } catch(e) { alert('Delete failed: ' + e.message) }
   }
 
   function startEdit(group) {
@@ -228,11 +280,69 @@ export default function Groups() {
               Delete {selected.size} student{selected.size>1?'s':''}
             </button>
           )}
+          {canEdit && (
+            <button onClick={()=>setShowCreate(v=>!v)}
+              className="btn-primary flex items-center gap-2 text-sm">
+              <Plus size={14}/> New Group
+            </button>
+          )}
           <button onClick={load} disabled={loading} className="btn-secondary flex items-center gap-2 text-sm">
             <RefreshCw size={14} className={loading?'animate-spin':''}/> Refresh
           </button>
         </div>
       </div>
+
+      {/* Create group form */}
+      {showCreate && (
+        <div className="card p-5 space-y-4 border border-gold-500/30">
+          <p className="text-sm font-semibold text-slate-100">New Research Group</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-navy-400 mb-1">Group Name <span className="text-red-400">*</span></label>
+              <input className="input w-full text-sm" placeholder="e.g. 2024 Group 1"
+                value={createForm.name} onChange={e=>setCreateForm(p=>({...p,name:e.target.value}))}/>
+            </div>
+            <div>
+              <label className="block text-xs text-navy-400 mb-1">Cohort Year</label>
+              <input className="input w-full text-sm" type="number" placeholder={new Date().getFullYear()}
+                value={createForm.academic_year} onChange={e=>setCreateForm(p=>({...p,academic_year:e.target.value}))}/>
+            </div>
+            <div>
+              <label className="block text-xs text-navy-400 mb-1">Research Area</label>
+              <input className="input w-full text-sm" placeholder="e.g. Microbiology"
+                value={createForm.research_area} onChange={e=>setCreateForm(p=>({...p,research_area:e.target.value}))}/>
+            </div>
+            <div>
+              <label className="block text-xs text-navy-400 mb-1">Supervisor</label>
+              <select className="input w-full text-sm" value={createForm.supervisor_id}
+                onChange={e=>setCreateForm(p=>({...p,supervisor_id:e.target.value}))}>
+                <option value="">— Select Supervisor —</option>
+                {supervisors.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs text-navy-400 mb-1">Proposal Title (optional)</label>
+              <input className="input w-full text-sm" placeholder="Initial proposal title"
+                value={createForm.proposal_title} onChange={e=>setCreateForm(p=>({...p,proposal_title:e.target.value}))}/>
+            </div>
+            <div className="col-span-2">
+              <label className="block text-xs text-navy-400 mb-1">Notes (optional)</label>
+              <textarea className="input w-full text-sm resize-none" rows={2}
+                value={createForm.notes} onChange={e=>setCreateForm(p=>({...p,notes:e.target.value}))}/>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={handleCreateGroup} disabled={creating}
+              className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
+              {creating?<><Loader2 size={13} className="animate-spin"/>Creating…</>:<><Plus size={13}/>Create Group</>}
+            </button>
+            <button onClick={()=>{setShowCreate(false);setCreateMsg('')}} className="btn-ghost text-sm">
+              <X size={13}/> Cancel
+            </button>
+            {createMsg && <p className="text-xs text-red-400">{createMsg}</p>}
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex gap-3 flex-wrap">
@@ -291,7 +401,6 @@ export default function Groups() {
             const isExpanded = expanded[group.id]
             const isEditing  = editing===group.id
             const accent     = group.departments?.accent_color||'#d4a843'
-            const primary    = group.departments?.primary_color||'#1e3a5f'
 
             return (
               <div key={group.id} className="card overflow-hidden">
@@ -320,9 +429,14 @@ export default function Groups() {
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     {canEdit&&!isEditing&&(
-                      <button onClick={()=>startEdit(group)} className="btn-ghost p-2 rounded-xl" title="Edit group">
-                        <Edit2 size={14} className="text-navy-400"/>
-                      </button>
+                      <>
+                        <button onClick={()=>startEdit(group)} className="btn-ghost p-2 rounded-xl" title="Edit group">
+                          <Edit2 size={14} className="text-navy-400"/>
+                        </button>
+                        <button onClick={()=>handleDeleteGroup(group)} className="btn-ghost p-2 rounded-xl" title="Delete group">
+                          <Trash2 size={14} className="text-red-400/50 hover:text-red-400"/>
+                        </button>
+                      </>
                     )}
                     <button onClick={()=>setExpanded(prev=>({...prev,[group.id]:!prev[group.id]}))} className="btn-ghost p-2 rounded-xl">
                       {isExpanded?<ChevronUp size={16} className="text-navy-400"/>:<ChevronDown size={16} className="text-navy-400"/>}
