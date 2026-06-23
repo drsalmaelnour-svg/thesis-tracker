@@ -3,10 +3,11 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Mail, Settings, GraduationCap,
   Bell, FileText, ClipboardList, TrendingUp, Calendar,
-  Clock, Award, LogOut, Shield, ChevronDown
+  Clock, Award, LogOut, Shield, ChevronDown, Sun, Moon
 } from 'lucide-react'
 import { logout, getSession, isAdmin, getDeptInfo, getRole, switchRole, getAvailableRoles } from '../lib/auth'
 import { useTheme } from '../context/ThemeContext'
+import { useColorMode } from '../context/ThemeContext'
 import { useRole } from '../context/RoleContext'
 
 const ALL_NAV = [
@@ -29,9 +30,10 @@ export default function Sidebar({ setViewingDept, viewingDept, setViewingLevel, 
   const session   = getSession()
   const admin     = isAdmin()
   const dept      = getDeptInfo()
-  const role      = getRole()
-  const theme     = useTheme()
-  const { can }   = useRole() || { can: { nav: {} } }
+  const role            = getRole()
+  const theme           = useTheme()
+  const { mode, toggleMode } = useColorMode()
+  const { can }         = useRole() || { can: { nav: {} } }
   const [depts, setDepts] = useState([])
 
   useEffect(() => {
@@ -184,6 +186,17 @@ export default function Sidebar({ setViewingDept, viewingDept, setViewingLevel, 
             </span>
           )}
         </div>
+        {/* Light/Dark mode toggle */}
+        <button onClick={toggleMode}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs transition-all mb-1"
+          style={{color:'rgba(255,255,255,0.5)'}}
+          onMouseEnter={e=>{e.currentTarget.style.color='rgba(255,255,255,0.9)';e.currentTarget.style.background='rgba(255,255,255,0.08)'}}
+          onMouseLeave={e=>{e.currentTarget.style.color='rgba(255,255,255,0.5)';e.currentTarget.style.background='transparent'}}>
+          {mode==='dark'
+            ? <><Sun size={13}/> Switch to Light Mode</>
+            : <><Moon size={13}/> Switch to Dark Mode</>}
+        </button>
+
         <button onClick={handleLogout}
           className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs transition-all"
           style={{color:'rgba(255,255,255,0.4)'}}
