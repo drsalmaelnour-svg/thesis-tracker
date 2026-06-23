@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useDept } from '../context/DeptContext'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   AlertCircle, CheckCircle2, GraduationCap, Mail, Bell,
   ArrowRight, RefreshCw, TrendingUp, Users, Clock,
@@ -39,12 +39,13 @@ function ActionCard({ icon: Icon, label, value, sub, color, to, alert }) {
   return to ? <Link to={to}>{card}</Link> : card
 }
 
-function CohortRing({ rate, label, count }) {
+function CohortRing({ rate, label, count, onClick }) {
   const r = 28, circ = 2 * Math.PI * r
   const offset = circ - (rate / 100) * circ
   return (
-    <div className="flex flex-col items-center gap-2">
-      <div className="relative w-20 h-20">
+    <div className="flex flex-col items-center gap-2 cursor-pointer group" onClick={onClick}
+      title={`View ${label} students`}>
+      <div className="relative w-20 h-20 transition-transform group-hover:scale-110">
         <svg width="80" height="80" viewBox="0 0 80 80">
           <circle cx="40" cy="40" r={r} fill="none" stroke="#1e3a5f" strokeWidth="8" />
           <circle cx="40" cy="40" r={r} fill="none" stroke="#d4a843" strokeWidth="8"
@@ -56,13 +57,15 @@ function CohortRing({ rate, label, count }) {
           <span className="text-sm font-bold text-gold-300">{rate}%</span>
         </div>
       </div>
-      <p className="text-xs font-semibold text-slate-300">{label}</p>
+      <p className="text-xs font-semibold text-slate-300 group-hover:text-gold-400 transition-colors">{label}</p>
       <p className="text-xs text-navy-500">{count} students</p>
+      <p className="text-xs text-navy-600 group-hover:text-gold-500 transition-colors">View →</p>
     </div>
   )
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate()
   const { effectiveDeptId, effectiveProgLevel, viewingDept, viewingLevel } = useDept() || {}
   const [students, setStudents]     = useState([])
   const [supCheckins, setSupCheckins] = useState([])
@@ -172,7 +175,8 @@ export default function Dashboard() {
           </h2>
           <div className="flex items-center gap-12 flex-wrap">
             {cohortStats.map(c => (
-              <CohortRing key={c.year} rate={c.rate} label={`${c.year} Cohort`} count={c.total} />
+              <CohortRing key={c.year} rate={c.rate} label={`${c.year} Cohort`} count={c.total}
+                onClick={() => navigate(`/students?cohort=${c.year}`)} />
             ))}
             {cohortStats.length === 0 && (
               <p className="text-sm text-navy-500">No cohort data yet.</p>
