@@ -176,7 +176,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-12 flex-wrap">
             {cohortStats.map(c => (
               <CohortRing key={c.year} rate={c.rate} label={`${c.year} Cohort`} count={c.total}
-                onClick={() => navigate(`/students?cohort=${c.year}`)} />
+                onClick={() => navigate({ pathname: '/students', search: `?cohort=${c.year}` })} />
             ))}
             {cohortStats.length === 0 && (
               <p className="text-sm text-navy-500">No cohort data yet.</p>
