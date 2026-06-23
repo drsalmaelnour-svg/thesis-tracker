@@ -22,12 +22,17 @@ export default function Students() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
-  const [cohortFilter, setCohortFilter] = useState(() => {
-    const params = new URLSearchParams(window.location.search)
-    return params.get('cohort') || 'all'
-  })
+  const [cohortFilter, setCohortFilter] = useState('all')
   const [showAdd, setShowAdd] = useState(false)
   const [showImport, setShowImport] = useState(false)
+
+  // Read cohort param from URL whenever location changes
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const cohort = params.get('cohort')
+    if (cohort) setCohortFilter(cohort)
+    else setCohortFilter('all')
+  }, [location.search])
   const [editStudent, setEditStudent] = useState(null)
   const [emailStudent, setEmailStudent] = useState(null)
   const [selected, setSelected] = useState([])
