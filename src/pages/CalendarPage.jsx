@@ -2,7 +2,8 @@ import { useDept } from '../context/DeptContext'
 import { useState, useEffect, useRef } from 'react'
 import {
   Calendar, Plus, Trash2, Save, Loader2, Send, Upload,
-  ChevronDown, Edit2, X, Download, FileSpreadsheet
+  ChevronDown, Edit2, X, Download, FileSpreadsheet,
+  Video, Users, ClipboardCheck, BookOpen
 } from 'lucide-react'
 import {
   getStudentsWithProgress, getCalendarEvents,
@@ -10,20 +11,32 @@ import {
 } from '../lib/supabase'
 import { sendStudentEmail } from '../lib/emailService'
 
+// Solid pastel backgrounds (not translucent) so black text stays readable
 const EVENT_COLORS = [
-  { value: 'gold',    label: 'Gold',    cls: 'bg-gold-500/20 border-gold-500/40 text-gold-300'       },
-  { value: 'blue',    label: 'Blue',    cls: 'bg-blue-500/20 border-blue-500/40 text-blue-300'        },
-  { value: 'emerald', label: 'Green',   cls: 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' },
-  { value: 'red',     label: 'Red',     cls: 'bg-red-500/20 border-red-500/40 text-red-300'           },
-  { value: 'purple',  label: 'Purple',  cls: 'bg-purple-500/20 border-purple-500/40 text-purple-300'  },
+  { value: 'gold',    label: 'Gold',    cls: 'bg-gold-300 border-gold-500/50 text-black'       },
+  { value: 'blue',    label: 'Blue',    cls: 'bg-blue-300 border-blue-500/50 text-black'        },
+  { value: 'emerald', label: 'Green',   cls: 'bg-emerald-300 border-emerald-500/50 text-black'  },
+  { value: 'red',     label: 'Red',     cls: 'bg-red-300 border-red-500/50 text-black'          },
+  { value: 'purple',  label: 'Purple',  cls: 'bg-purple-300 border-purple-500/50 text-black'    },
+]
+
+const ACTIVITY_TYPES = [
+  { value: 'online',       label: 'Online Session',       icon: Video           },
+  { value: 'face_to_face', label: 'Face-to-Face Session', icon: Users           },
+  { value: 'exam',         label: 'Exam',                 icon: ClipboardCheck  },
+  { value: 'regular',      label: 'Regular Session',      icon: BookOpen        },
 ]
 
 function colorCls(color) {
   return EVENT_COLORS.find(c=>c.value===color)?.cls || EVENT_COLORS[0].cls
 }
 
+function activityMeta(type) {
+  return ACTIVITY_TYPES.find(a=>a.value===type) || ACTIVITY_TYPES[3]
+}
+
 function blank(cohortYear) {
-  return { id: null, cohort_year: cohortYear, title: '', event_date: '', milestone_id: '', description: '', color: 'gold' }
+  return { id: null, cohort_year: cohortYear, title: '', event_date: '', milestone_id: '', description: '', color: 'gold', activity_type: 'regular' }
 }
 
 export default function CalendarPage() {
@@ -98,8 +111,9 @@ export default function CalendarPage() {
     const text = await file.text()
     const lines = text.trim().split('\n').slice(1) // skip header
     const newEvents = []
+    const validTypes = ACTIVITY_TYPES.map(a=>a.value)
     for (const line of lines) {
-      const [title, event_date, milestone_id, description, color] = line.split(',').map(v=>v.trim().replace(/^"|"$/g,''))
+      const [title, event_date, milestone_id, description, color, activity_type] = line.split(',').map(v=>v.trim().replace(/^"|"$/g,''))
       if (title && event_date) {
         newEvents.push({
           id: crypto.randomUUID(),
@@ -107,6 +121,7 @@ export default function CalendarPage() {
           title, event_date, color: color||'gold',
           milestone_id: milestone_id||'',
           description: description||'',
+          activity_type: validTypes.includes(activity_type) ? activity_type : 'regular',
         })
       }
     }
@@ -117,10 +132,11 @@ export default function CalendarPage() {
   // Export calendar as CSV template
   function exportTemplate() {
     const rows = [
-      'Title,Date (YYYY-MM-DD),Milestone ID (optional),Description (optional),Color (gold/blue/emerald/red/purple)',
-      'ORCID Registration Deadline,2025-02-01,orcid,All students must register,gold',
-      'Proposal Defense Week,2025-04-15,proposal_defense,Group A and B sessions,blue',
-      'IRB Submission Deadline,2025-05-01,irb_approval,,red',
+      'Title,Date (YYYY-MM-DD),Milestone ID (optional),Description (optional),Color (gold/blue/emerald/red/purple),Activity Type (online/face_to_face/exam/regular)',
+      'ORCID Registration Deadline,2025-02-01,orcid,All students must register,gold,regular',
+      'Proposal Defense Week,2025-04-15,proposal_defense,Group A and B sessions,blue,face_to_face',
+      'IRB Submission Deadline,2025-05-01,irb_approval,,red,online',
+      'Comprehensive Exam,2025-06-10,,,purple,exam',
     ].join('\n')
     const blob = new Blob([rows], {type:'text/csv'})
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
@@ -209,7 +225,13 @@ export default function CalendarPage() {
                         <p className="text-xs opacity-70">{new Date(e.event_date).toLocaleDateString('en-GB',{weekday:'short'})}</p>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold">{e.title}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold">{e.title}</p>
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-black/10 text-[10px] font-medium uppercase tracking-wide">
+                            {(() => { const A = activityMeta(e.activity_type).icon; return <A size={10}/> })()}
+                            {activityMeta(e.activity_type).label}
+                          </span>
+                        </div>
                         {e.milestone_id && (
                           <p className="text-xs opacity-70 mt-0.5">
                             {MILESTONES.find(m=>m.id===e.milestone_id)?.icon} {MILESTONES.find(m=>m.id===e.milestone_id)?.name}
@@ -218,7 +240,7 @@ export default function CalendarPage() {
                         {e.description && <p className="text-xs opacity-60 mt-0.5">{e.description}</p>}
                       </div>
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                        <button onClick={()=>setEditing({...e})} className="btn-ghost p-1.5 rounded-lg"><Edit2 size={12}/></button>
+                        <button onClick={()=>setEditing({...e, activity_type: e.activity_type || 'regular'})} className="btn-ghost p-1.5 rounded-lg"><Edit2 size={12}/></button>
                         <button onClick={()=>removeEvent(e.id)} className="btn-ghost p-1.5 rounded-lg text-red-400/60 hover:text-red-400"><Trash2 size={12}/></button>
                       </div>
                     </div>
@@ -254,6 +276,24 @@ export default function CalendarPage() {
                   <label className="block text-xs text-navy-400 mb-1">Date *</label>
                   <input type="date" className="input text-sm"
                     value={editing.event_date} onChange={e=>setEditing(v=>({...v,event_date:e.target.value}))}/>
+                </div>
+                <div>
+                  <label className="block text-xs text-navy-400 mb-1.5">Activity Type</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {ACTIVITY_TYPES.map(a => {
+                      const Icon = a.icon
+                      const active = editing.activity_type === a.value
+                      return (
+                        <button key={a.value} type="button"
+                          onClick={()=>setEditing(v=>({...v,activity_type:a.value}))}
+                          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+                            active ? 'bg-gold-500/15 border-gold-500/40 text-gold-300' : 'border-navy-600/50 text-navy-400 hover:text-slate-300'
+                          }`}>
+                          <Icon size={13}/> {a.label}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs text-navy-400 mb-1">Milestone (optional)</label>
@@ -303,7 +343,7 @@ export default function CalendarPage() {
               </div>
               <div className="mt-4 pt-4 border-t border-navy-700/50 space-y-2 text-xs text-navy-400 leading-relaxed">
                 <p className="font-medium text-slate-300">CSV Upload Format:</p>
-                <p>Title, Date (YYYY-MM-DD), Milestone ID, Description, Color</p>
+                <p>Title, Date (YYYY-MM-DD), Milestone ID, Description, Color, Activity Type</p>
                 <button onClick={exportTemplate} className="text-gold-400 hover:underline mt-1">
                   Download template CSV →
                 </button>
