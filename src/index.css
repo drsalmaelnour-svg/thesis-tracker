@@ -11,7 +11,7 @@
   --bg-glow-3:  rgba(111,179,172,0.07);
   --ink:        #f4e9d7;
   --ink-dim:    #c7ae8a;
-  --ink-faint:  #8c7458;
+  --ink-faint:  #927c62;
   --hair:       rgba(230,200,150,0.09);
   --card:       rgba(255,255,255,0.035);
   --card-hover: rgba(255,255,255,0.06);
@@ -40,15 +40,15 @@
   --bg-glow-3:  rgba(46,110,110,0.05);
   --ink:        #2a2013;
   --ink-dim:    #6e5c40;
-  --ink-faint:  #9c8b6a;
+  --ink-faint:  #796c52;
   --hair:       rgba(120,95,50,0.16);
   --card:       rgba(255,255,255,0.62);
   --card-hover: rgba(255,255,255,0.85);
   --card-brd:   rgba(150,115,55,0.22);
   --input-bg:   rgba(255,255,255,0.85);
-  --gold-accent:       #b8860b;
-  --gold-accent-hover: #9c7209;
-  --on-gold:    #2a2013;
+  --gold-accent:       #8f6808;
+  --gold-accent-hover: #7a5906;
+  --on-gold:    #fdf6e8;
   --scrollbar:  #d8c9a3;
   --sidebar-bg: #efe0b8;
   --badge-pending-bg:#f1f5f9e6;   --badge-pending-fg:#475569;   --badge-pending-brd:#94a3b866;
@@ -56,7 +56,7 @@
   --badge-completed-bg:#d1fae5e6; --badge-completed-fg:#065f46; --badge-completed-brd:#6ee7b780;
   --badge-overdue-bg:#fee2e2e6;   --badge-overdue-fg:#991b1b;   --badge-overdue-brd:#fca5a580;
   --status-good-bg: rgba(47,122,117,0.10);  --status-good-fg:#2f7a75; --status-good-brd: rgba(47,122,117,0.3);
-  --status-warn-bg: rgba(184,134,11,0.10);  --status-warn-fg:#9c7209; --status-warn-brd: rgba(184,134,11,0.32);
+  --status-warn-bg: rgba(184,134,11,0.10);  --status-warn-fg:#8f6808; --status-warn-brd: rgba(184,134,11,0.32);
   --status-bad-bg:  rgba(178,58,46,0.10);   --status-bad-fg:#b23a2e; --status-bad-brd: rgba(178,58,46,0.32);
   --status-info-bg: rgba(47,90,143,0.10);   --status-info-fg:#2f5a8f; --status-info-brd: rgba(47,90,143,0.3);
 }

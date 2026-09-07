@@ -344,19 +344,20 @@ export default function StudentDetail() {
             const deadline = getDeadline(m.id)
             const isOverdue = deadline && new Date(deadline.date) < new Date() && status !== 'completed'
             return (
-              <div key={m.id} className={`flex items-center gap-3 p-4 rounded-xl border transition-all
-                ${status==='completed'   ? 'border-emerald-700/30 bg-emerald-900/10' :
-                  status==='overdue'     ? 'border-red-700/30 bg-red-900/10' :
-                  status==='in_progress' ? 'border-blue-700/30 bg-blue-900/10' :
-                  isOverdue              ? 'border-red-700/20 bg-red-900/5' :
-                  'border-navy-700/40 bg-navy-800/20'}`}>
-                <span className="text-navy-500 text-xs w-4 shrink-0">{i+1}</span>
+              <div key={m.id} className="flex items-center gap-3 p-4 rounded-xl transition-all card"
+                style={{
+                  borderLeft: status==='completed'   ? '3px solid var(--status-good-fg)' :
+                              (status==='overdue' || isOverdue) ? '3px solid var(--status-bad-fg)' :
+                              status==='in_progress' ? '3px solid var(--status-info-fg)' :
+                              '3px solid transparent'
+                }}>
+                <span className="text-xs w-4 shrink-0" style={{color:'var(--ink-faint)'}}>{i+1}</span>
                 <span className="text-base shrink-0">{m.icon}</span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-200">{m.name}</p>
-                  {sm?.completed_at && <p className="text-xs text-navy-400">Completed {new Date(sm.completed_at).toLocaleDateString('en-GB')}</p>}
+                  <p className="text-sm font-medium" style={{color:'var(--ink)'}}>{m.name}</p>
+                  {sm?.completed_at && <p className="text-xs" style={{color:'var(--ink-faint)'}}>Completed {new Date(sm.completed_at).toLocaleDateString('en-GB')}</p>}
                   {deadline && status !== 'completed' && (
-                    <p className={`text-xs mt-0.5 ${isOverdue ? 'text-red-400' : 'text-navy-400'}`}>
+                    <p className={`text-xs mt-0.5 ${isOverdue ? 'tone-text-bad' : ''}`} style={!isOverdue?{color:'var(--ink-faint)'}:{}}>
                       {isOverdue ? '⚠ Overdue · ' : 'Due: '}
                       {new Date(deadline.date).toLocaleDateString('en-GB')}
                       {deadline.isOverride && <span className="ml-1 text-gold-500/60">(custom)</span>}

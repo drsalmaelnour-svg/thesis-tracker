@@ -1,33 +1,43 @@
-import { useState } from 'react'
+import { useState, Suspense, lazy } from 'react'
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { isLoggedIn, isAdmin, getSession, getRole } from './lib/auth'
-import Login from './pages/Login'
-import ForgotPassword from './pages/ForgotPassword'
-import ResearchImpact from './pages/ResearchImpact'
-import Groups from './pages/Groups'
-import SupervisorResearchImpact from './pages/SupervisorResearchImpact'
-import ResetPassword from './pages/ResetPassword'
 import { ThemeProvider } from './context/ThemeContext'
 import { RoleProvider } from './context/RoleContext'
 import { DeptProvider } from './context/DeptContext'
 import Sidebar from './components/Sidebar'
-import Dashboard from './pages/Dashboard'
-import Students from './pages/Students'
-import StudentDetail from './pages/StudentDetail'
-import EmailCenter from './pages/EmailCenter'
-import Reminders from './pages/Reminders'
-import Settings from './pages/Settings'
-import Reports from './pages/Reports'
-import SupervisorRespond from './pages/SupervisorRespond'
-import Checkins from './pages/Checkins'
-import Analytics from './pages/Analytics'
-import CalendarPage from './pages/CalendarPage'
-import Deadlines from './pages/Deadlines'
-import Assessments from './pages/Assessments'
-import ExaminerResponse from './pages/ExaminerResponse'
-import ExaminerPortal from './pages/ExaminerPortal'
-import StudentCheckin from './pages/StudentCheckin'
-import Respond from './pages/Respond'
+
+const Login                     = lazy(() => import('./pages/Login'))
+const ForgotPassword            = lazy(() => import('./pages/ForgotPassword'))
+const ResearchImpact            = lazy(() => import('./pages/ResearchImpact'))
+const Groups                    = lazy(() => import('./pages/Groups'))
+const SupervisorResearchImpact  = lazy(() => import('./pages/SupervisorResearchImpact'))
+const ResetPassword             = lazy(() => import('./pages/ResetPassword'))
+const Dashboard                 = lazy(() => import('./pages/Dashboard'))
+const Students                  = lazy(() => import('./pages/Students'))
+const StudentDetail             = lazy(() => import('./pages/StudentDetail'))
+const EmailCenter               = lazy(() => import('./pages/EmailCenter'))
+const Reminders                 = lazy(() => import('./pages/Reminders'))
+const Settings                  = lazy(() => import('./pages/Settings'))
+const Reports                   = lazy(() => import('./pages/Reports'))
+const SupervisorRespond         = lazy(() => import('./pages/SupervisorRespond'))
+const Checkins                  = lazy(() => import('./pages/Checkins'))
+const Analytics                 = lazy(() => import('./pages/Analytics'))
+const CalendarPage              = lazy(() => import('./pages/CalendarPage'))
+const Deadlines                 = lazy(() => import('./pages/Deadlines'))
+const Assessments               = lazy(() => import('./pages/Assessments'))
+const ExaminerResponse          = lazy(() => import('./pages/ExaminerResponse'))
+const ExaminerPortal            = lazy(() => import('./pages/ExaminerPortal'))
+const StudentCheckin            = lazy(() => import('./pages/StudentCheckin'))
+const Respond                   = lazy(() => import('./pages/Respond'))
+
+function PageLoader() {
+  return (
+    <div className="p-8">
+      <div className="h-8 w-40 rounded-lg shimmer mb-6" style={{background:'var(--card)'}}/>
+      <div className="h-32 rounded-2xl shimmer" style={{background:'var(--card)'}}/>
+    </div>
+  )
+}
 
 function Layout({ children, setViewingLevel, viewingLevel }) {
   if (!isLoggedIn()) return <Navigate to="/login" replace />
@@ -35,7 +45,9 @@ function Layout({ children, setViewingLevel, viewingLevel }) {
     <div className="flex min-h-screen">
       <Sidebar setViewingLevel={setViewingLevel} viewingLevel={viewingLevel}/>
       <main className="flex-1 overflow-y-auto">
-        {children}
+        <Suspense fallback={<PageLoader/>}>
+          {children}
+        </Suspense>
       </main>
     </div>
   )
@@ -55,6 +67,7 @@ export default function App() {
     <ThemeProvider>
     <DeptProvider viewingLevel={viewingLevel}>
     <RoleProvider>
+      <Suspense fallback={<PageLoader/>}>
       <Routes>
         <Route path="/login"           element={<Login />} />
         <Route path="/forgot-password"  element={<ForgotPassword />} />
@@ -83,6 +96,7 @@ export default function App() {
         <Route path="/student-checkin" element={<StudentCheckin />} />
         <Route path="/settings" element={<Layout setViewingLevel={setViewingLevel} viewingLevel={viewingLevel}><Settings /></Layout>} />
       </Routes>
+      </Suspense>
     </RoleProvider>
     </DeptProvider>
     </ThemeProvider>
