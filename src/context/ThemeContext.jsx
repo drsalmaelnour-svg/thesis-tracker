@@ -5,11 +5,6 @@ const DEFAULT_THEME = { primary: '#1e3a5f', accent: '#d4a843', bg: '#f1f5f9' }
 
 const DEPT_THEMES = {
   'Medical Laboratory Sciences': { primary:'#1e3a5f', accent:'#d4a843', bg:'#f1f5f9' },
-  'Physiotherapy':               { primary:'#1a4731', accent:'#65a30d', bg:'#f0fdf4' },
-  'Medical Imaging':             { primary:'#134e4a', accent:'#0891b2', bg:'#f0fdfa' },
-  'Anaesthesia Technology':      { primary:'#312e81', accent:'#7c3aed', bg:'#eef2ff' },
-  'Optometry':                   { primary:'#1e3a8a', accent:'#0284c7', bg:'#eff6ff' },
-  'Audiology':                   { primary:'#431407', accent:'#d97706', bg:'#fffbeb' },
 }
 
 const ThemeContext = createContext(DEFAULT_THEME)

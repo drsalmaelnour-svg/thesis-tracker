@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Mail, Settings, GraduationCap,
@@ -25,7 +25,7 @@ const ALL_NAV = [
   { to:'/settings',     icon:Settings,        label:'Settings',     key:'settings'    },
 ]
 
-export default function Sidebar({ setViewingDept, viewingDept, setViewingLevel, viewingLevel }) {
+export default function Sidebar({ setViewingLevel, viewingLevel }) {
   const navigate  = useNavigate()
   const session   = getSession()
   const admin     = isAdmin()
@@ -34,17 +34,6 @@ export default function Sidebar({ setViewingDept, viewingDept, setViewingLevel, 
   const theme           = useTheme()
   const { mode, toggleMode } = useColorMode()
   const { can }         = useRole() || { can: { nav: {} } }
-  const [depts, setDepts] = useState([])
-
-  useEffect(() => {
-    if (!admin && role !== 'dean') return
-    import('../lib/supabase').then(({ supabase }) =>
-      supabase.from('departments')
-        .select('id,name,primary_color,accent_color,bg_color')
-        .order('name')
-        .then(({ data }) => setDepts(data || []))
-    )
-  }, [admin])
 
   const availableRoles = getAvailableRoles()
   const [switching, setSwitching] = useState(false)
@@ -65,7 +54,7 @@ export default function Sidebar({ setViewingDept, viewingDept, setViewingLevel, 
 
   const sidebarBg     = theme?.primary || '#1e3a5f'
   const accentColor   = theme?.accent  || '#d4a843'
-  const deptName      = admin ? (viewingDept || 'All Departments') : dept?.name || ''
+  const deptName      = dept?.name || 'Medical Laboratory Sciences'
 
   return (
     <aside className="w-64 shrink-0 flex flex-col min-h-screen"
@@ -87,7 +76,7 @@ export default function Sidebar({ setViewingDept, viewingDept, setViewingLevel, 
         <div className="px-2.5 py-1.5 rounded-lg text-xs font-medium"
           style={{background:'rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.7)'}}>
           {admin
-            ? <span className="flex items-center gap-1.5"><Shield size={11} style={{color:accentColor}}/> {viewingDept ? `Viewing: ${viewingDept}` : 'Super Admin'}</span>
+            ? <span className="flex items-center gap-1.5"><Shield size={11} style={{color:accentColor}}/> Admin</span>
             : <span>{deptName}</span>
           }
         </div>
@@ -125,34 +114,6 @@ export default function Sidebar({ setViewingDept, viewingDept, setViewingLevel, 
               </button>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* Department list — admin and dean */}
-      {(admin || role === 'dean') && depts.length > 0 && (
-        <div className="px-3 pb-2 border-t" style={{borderColor:'rgba(255,255,255,0.08)', paddingTop:'12px'}}>
-          <p className="text-xs px-2 mb-2 font-semibold uppercase tracking-wider"
-            style={{color:'rgba(255,255,255,0.3)'}}>Departments</p>
-          <button
-            onClick={()=>setViewingDept?.(null)}
-            className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium transition-all flex items-center gap-2 mb-0.5"
-            style={!viewingDept
-              ? {background:'rgba(255,255,255,0.12)', color:'#fff'}
-              : {color:'rgba(255,255,255,0.45)'}}>
-            <span>👁</span> All Departments
-          </button>
-          {depts.map(d => (
-            <button key={d.id}
-              onClick={()=>setViewingDept?.(d.name)}
-              className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium transition-all flex items-center gap-2"
-              style={viewingDept===d.name
-                ? {background:`${d.accent_color}22`, color:d.accent_color, border:`1px solid ${d.accent_color}44`}
-                : {color:'rgba(255,255,255,0.45)', border:'1px solid transparent'}}>
-              <span className="w-2 h-2 rounded-full shrink-0"
-                style={{background:d.accent_color||'#d4a843'}}/>
-              <span className="truncate">{d.name}</span>
-            </button>
-          ))}
         </div>
       )}
 
