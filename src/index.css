@@ -13,12 +13,14 @@
   --ink-dim:    #c7ae8a;
   --ink-faint:  #927c62;
   --hair:       rgba(230,200,150,0.09);
-  --card:       rgba(255,255,255,0.035);
-  --card-hover: rgba(255,255,255,0.06);
-  --card-brd:   rgba(210,175,120,0.13);
-  --input-bg:   rgba(255,255,255,0.04);
+  --card:       rgba(255,255,255,0.06);
+  --card-hover: rgba(255,255,255,0.095);
+  --card-brd:   rgba(210,175,120,0.20);
+  --input-bg:   rgba(255,255,255,0.06);
   --gold-accent:       #e8bf5a;
   --gold-accent-hover: #f0d080;
+  --gold-fill:         #e8bf5a;
+  --gold-fill-hover:   #f0d080;
   --on-gold:    #241811;
   --scrollbar:  #3a2a1e;
   --sidebar-bg: #180f0a;
@@ -26,10 +28,10 @@
   --badge-progress-bg:#1e3a8acc;  --badge-progress-fg:#93c5fd;  --badge-progress-brd:#1d4ed866;
   --badge-completed-bg:#064e3bcc; --badge-completed-fg:#6ee7b7; --badge-completed-brd:#05966966;
   --badge-overdue-bg:#7f1d1dcc;   --badge-overdue-fg:#fca5a5;   --badge-overdue-brd:#b91c1c66;
-  --status-good-bg: rgba(127,196,191,0.12); --status-good-fg:#7fc4bf; --status-good-brd: rgba(127,196,191,0.28);
-  --status-warn-bg: rgba(232,191,90,0.12);  --status-warn-fg:#e8bf5a; --status-warn-brd: rgba(232,191,90,0.28);
-  --status-bad-bg:  rgba(226,104,92,0.13);  --status-bad-fg:#e2685c; --status-bad-brd: rgba(226,104,92,0.3);
-  --status-info-bg: rgba(92,136,192,0.14);  --status-info-fg:#7fa5d6; --status-info-brd: rgba(92,136,192,0.3);
+  --status-good-bg: rgba(127,196,191,0.17); --status-good-fg:#7fc4bf; --status-good-brd: rgba(127,196,191,0.35);
+  --status-warn-bg: rgba(232,191,90,0.17);  --status-warn-fg:#e8bf5a; --status-warn-brd: rgba(232,191,90,0.35);
+  --status-bad-bg:  rgba(226,104,92,0.18);  --status-bad-fg:#e2685c; --status-bad-brd: rgba(226,104,92,0.38);
+  --status-info-bg: rgba(92,136,192,0.19);  --status-info-fg:#7fa5d6; --status-info-brd: rgba(92,136,192,0.38);
 }
 
 /* Ivory gold */
@@ -42,23 +44,25 @@
   --ink-dim:    #6e5c40;
   --ink-faint:  #796c52;
   --hair:       rgba(120,95,50,0.16);
-  --card:       rgba(255,255,255,0.62);
-  --card-hover: rgba(255,255,255,0.85);
-  --card-brd:   rgba(150,115,55,0.22);
-  --input-bg:   rgba(255,255,255,0.85);
+  --card:       rgba(255,255,255,0.78);
+  --card-hover: rgba(255,255,255,0.92);
+  --card-brd:   rgba(150,115,55,0.32);
+  --input-bg:   rgba(255,255,255,0.9);
   --gold-accent:       #8f6808;
   --gold-accent-hover: #7a5906;
-  --on-gold:    #fdf6e8;
+  --gold-fill:         #c9960a;
+  --gold-fill-hover:   #a87e08;
+  --on-gold:    #2a2013;
   --scrollbar:  #d8c9a3;
   --sidebar-bg: #efe0b8;
   --badge-pending-bg:#f1f5f9e6;   --badge-pending-fg:#475569;   --badge-pending-brd:#94a3b866;
   --badge-progress-bg:#dbeafee6;  --badge-progress-fg:#1d4ed8;  --badge-progress-brd:#93c5fd80;
   --badge-completed-bg:#d1fae5e6; --badge-completed-fg:#065f46; --badge-completed-brd:#6ee7b780;
   --badge-overdue-bg:#fee2e2e6;   --badge-overdue-fg:#991b1b;   --badge-overdue-brd:#fca5a580;
-  --status-good-bg: rgba(47,122,117,0.10);  --status-good-fg:#2f7a75; --status-good-brd: rgba(47,122,117,0.3);
-  --status-warn-bg: rgba(184,134,11,0.10);  --status-warn-fg:#8f6808; --status-warn-brd: rgba(184,134,11,0.32);
-  --status-bad-bg:  rgba(178,58,46,0.10);   --status-bad-fg:#b23a2e; --status-bad-brd: rgba(178,58,46,0.32);
-  --status-info-bg: rgba(47,90,143,0.10);   --status-info-fg:#2f5a8f; --status-info-brd: rgba(47,90,143,0.3);
+  --status-good-bg: rgba(47,122,117,0.15);  --status-good-fg:#2f7a75; --status-good-brd: rgba(47,122,117,0.4);
+  --status-warn-bg: rgba(184,134,11,0.15);  --status-warn-fg:#8f6808; --status-warn-brd: rgba(184,134,11,0.4);
+  --status-bad-bg:  rgba(178,58,46,0.15);   --status-bad-fg:#b23a2e; --status-bad-brd: rgba(178,58,46,0.4);
+  --status-info-bg: rgba(47,90,143,0.15);   --status-info-fg:#2f5a8f; --status-info-brd: rgba(47,90,143,0.4);
 }
 
 @layer base {
@@ -86,28 +90,28 @@
     background: var(--card);
     border: 1px solid var(--card-brd);
     @apply rounded-2xl backdrop-blur-sm;
-    box-shadow: 0 20px 40px -28px rgba(0,0,0,0.35);
+    box-shadow: 0 24px 44px -24px rgba(0,0,0,0.45);
   }
   .card-hover {
     @apply card transition-all duration-200;
   }
   .card-hover:hover {
     background: var(--card-hover);
-    border-color: var(--gold-accent);
+    border-color: var(--gold-fill);
   }
   .btn-primary {
-    background: var(--gold-accent);
+    background: var(--gold-fill);
     color: var(--on-gold);
     @apply font-semibold px-4 py-2 rounded-xl transition-all duration-150 text-sm flex items-center gap-2 cursor-pointer;
   }
-  .btn-primary:hover { background: var(--gold-accent-hover); }
+  .btn-primary:hover { background: var(--gold-fill-hover); }
   .btn-secondary {
     background: var(--card);
     border: 1px solid var(--card-brd);
     color: var(--ink);
     @apply font-medium px-4 py-2 rounded-xl transition-all duration-150 text-sm flex items-center gap-2 cursor-pointer;
   }
-  .btn-secondary:hover { background: var(--card-hover); border-color: var(--gold-accent); }
+  .btn-secondary:hover { background: var(--card-hover); border-color: var(--gold-fill); }
   .btn-ghost {
     color: var(--ink-dim);
     @apply px-3 py-2 rounded-lg transition-all duration-150 text-sm flex items-center gap-2 cursor-pointer;
@@ -120,7 +124,7 @@
     @apply rounded-xl px-4 py-2.5 outline-none transition-all duration-150 text-sm w-full;
   }
   .input::placeholder { color: var(--ink-faint); }
-  .input:focus { border-color: var(--gold-accent); box-shadow: 0 0 0 3px rgba(232,191,90,0.15); }
+  .input:focus { border-color: var(--gold-fill); box-shadow: 0 0 0 3px rgba(232,191,90,0.18); }
 
   .badge-pending   { background: var(--badge-pending-bg);   color: var(--badge-pending-fg);   border: 1px solid var(--badge-pending-brd); }
   .badge-progress  { background: var(--badge-progress-bg);  color: var(--badge-progress-fg);  border: 1px solid var(--badge-progress-brd); }

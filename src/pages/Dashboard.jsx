@@ -24,12 +24,12 @@ const ACTIVITY_ICONS = {
 function MinorStat({ icon: Icon, value, label, tint }) {
   return (
     <div className="flex items-center gap-3.5 px-6 first:pl-0 last:pr-0" style={{borderRight:'1px solid var(--hair)'}}>
-      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{background:`${tint}22`, color:tint}}>
-        <Icon size={16}/>
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{background:`${tint}2e`, color:tint}}>
+        <Icon size={18}/>
       </div>
       <div>
-        <p className="font-display text-2xl font-medium leading-none" style={{color:'var(--ink)'}}>{value}</p>
-        <p className="text-[11px] mt-1.5 max-w-[100px] leading-tight" style={{color:'var(--ink-faint)'}}>{label}</p>
+        <p className="font-display text-[28px] font-medium leading-none" style={{color:'var(--ink)'}}>{value}</p>
+        <p className="text-[13px] font-medium mt-2 max-w-[110px] leading-tight" style={{color:'var(--ink-dim)'}}>{label}</p>
       </div>
     </div>
   )
@@ -45,11 +45,11 @@ function Ledger({ needsAttention, completedThisWeek, pendingSupCheckins, nearCom
         style={{left:-90, top:-140, background:'radial-gradient(circle, rgba(226,90,90,0.16), transparent 70%)'}}/>
       <button onClick={onNeedsAttention}
         className="text-left pr-9 mr-9 relative z-10 shrink-0" style={{borderRight:'1px solid var(--hair)'}}>
-        <p className="font-display font-medium leading-none" style={{fontSize:56, color:'#e25a5a', filter:'drop-shadow(0 2px 18px rgba(226,90,90,0.25))'}}>
+        <p className="font-display font-medium leading-none" style={{fontSize:60, color:'#e25a5a', filter:'drop-shadow(0 2px 18px rgba(226,90,90,0.3))'}}>
           {needsAttention}
         </p>
-        <p className="text-[13px] font-medium mt-2.5" style={{color:'var(--ink)'}}>Need attention</p>
-        <p className="text-[11px] mt-0.5" style={{color:'var(--ink-faint)'}}>Overdue or flagged in check-ins</p>
+        <p className="text-[15px] font-semibold mt-3" style={{color:'var(--ink)'}}>Need attention</p>
+        <p className="text-[12.5px] mt-0.5" style={{color:'var(--ink-dim)'}}>Overdue or flagged in check-ins</p>
       </button>
       <div className="flex-1 flex items-center justify-between relative z-10">
         <MinorStat icon={CheckCircle2}  value={completedThisWeek}  label="Completed this week"          tint="#5fa3a3"/>
@@ -203,7 +203,7 @@ export default function Dashboard() {
 
       {cohortStats.length > 0 && (
         <div className="card p-5">
-          <h2 className="font-display font-semibold mb-5 flex items-center gap-2" style={{color:'var(--ink)'}}>
+          <h2 className="font-display text-base font-semibold mb-5 flex items-center gap-2" style={{color:'var(--ink)'}}>
             <TrendingUp size={17} style={{color:'var(--gold-accent)'}} /> Cohort Progress
           </h2>
           <div className="flex items-center gap-12 flex-wrap">
@@ -219,7 +219,7 @@ export default function Dashboard() {
 
         <div className="col-span-2 card p-5">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="font-display font-semibold" style={{color:'var(--ink)'}}>Students</h2>
+            <h2 className="font-display text-base font-semibold" style={{color:'var(--ink)'}}>Students</h2>
             <Link to="/students" className="text-xs flex items-center gap-1" style={{color:'var(--gold-accent)'}}>
               View all <ArrowRight size={12} />
             </Link>
@@ -252,19 +252,19 @@ export default function Dashboard() {
                     style={{background: flagged ? 'rgba(226,90,90,0.05)' : 'transparent'}}>
                     <ProgressRing done={done} totalCount={MILESTONES.length} flagged={flagged}/>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <p className="text-sm font-medium truncate" style={{color:'var(--ink)'}}>{student.name}</p>
-                        {flagged && <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium"
-                          style={{color:'#e25a5a', background:'rgba(226,90,90,0.12)', border:'1px solid rgba(226,90,90,0.2)'}}>overdue</span>}
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-[15px] font-medium truncate" style={{color:'var(--ink)'}}>{student.name}</p>
+                        {flagged && <span className="text-[10.5px] px-1.5 py-0.5 rounded-md font-semibold"
+                          style={{color:'#e25a5a', background:'rgba(226,90,90,0.15)', border:'1px solid rgba(226,90,90,0.3)'}}>overdue</span>}
                       </div>
-                      <p className="text-xs truncate" style={{color:'var(--ink-faint)'}}>
+                      <p className="text-[13px] truncate" style={{color:'var(--ink-dim)'}}>
                         {done >= MILESTONES.length
-                          ? <>All milestones complete — <span style={{color:'var(--ink-dim)'}}>thesis submitted</span></>
-                          : <>{hasOverdue ? 'Stalled at' : 'In progress on'} <span style={{color:'var(--ink-dim)'}}>{currentMilestone?.name}</span></>
+                          ? <>All milestones complete — <span style={{color:'var(--ink)'}}>thesis submitted</span></>
+                          : <>{hasOverdue ? 'Stalled at' : 'In progress on'} <span style={{color:'var(--ink)'}}>{currentMilestone?.name}</span></>
                         }
                       </p>
                     </div>
-                    <span className="font-display text-xs shrink-0" style={{color:'var(--ink-dim)'}}>{done}/{MILESTONES.length}</span>
+                    <span className="font-display text-sm font-medium shrink-0" style={{color:'var(--ink-dim)'}}>{done}/{MILESTONES.length}</span>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                       <button
                         onClick={() => setEmailStudent(student)}
@@ -290,7 +290,7 @@ export default function Dashboard() {
         <div className="space-y-4">
 
           <div className="card p-5">
-            <h2 className="font-display font-semibold mb-4 flex items-center gap-2" style={{color:'var(--ink)'}}>
+            <h2 className="font-display text-base font-semibold mb-4 flex items-center gap-2" style={{color:'var(--ink)'}}>
               <AlertCircle size={15} className="text-red-400"/> Overdue Milestones
             </h2>
             {overdueItems.length === 0 ? (
@@ -307,8 +307,8 @@ export default function Dashboard() {
                       <span className="text-sm">{milestone?.icon}</span>
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs font-medium truncate" style={{color:'var(--ink)'}}>{student.name}</p>
-                      <p className="text-xs truncate" style={{color:'var(--ink-faint)'}}>{milestone?.name}</p>
+                      <p className="text-[13px] font-medium truncate" style={{color:'var(--ink)'}}>{student.name}</p>
+                      <p className="text-xs truncate" style={{color:'var(--ink-dim)'}}>{milestone?.name}</p>
                     </div>
                   </Link>
                 ))}
@@ -317,7 +317,7 @@ export default function Dashboard() {
           </div>
 
           <div className="card p-5">
-            <h2 className="font-display font-semibold mb-4 flex items-center gap-2" style={{color:'var(--ink)'}}>
+            <h2 className="font-display text-base font-semibold mb-4 flex items-center gap-2" style={{color:'var(--ink)'}}>
               <Clock size={15} style={{color:'var(--gold-accent)'}}/> Recent Activity
             </h2>
             {activity.length === 0 ? (
@@ -333,7 +333,7 @@ export default function Dashboard() {
                         <Icon size={12} className={cfg.color}/>
                       </div>
                       <div className="min-w-0">
-                        <p className="text-xs leading-relaxed line-clamp-2" style={{color:'var(--ink-dim)'}}>{a.description}</p>
+                        <p className="text-[13px] leading-relaxed line-clamp-2" style={{color:'var(--ink-dim)'}}>{a.description}</p>
                         <p className="text-xs mt-0.5" style={{color:'var(--ink-faint)'}}>
                           {a.students?.name && <span>{a.students.name} · </span>}
                           {formatDistanceToNow(new Date(a.created_at), {addSuffix:true})}
