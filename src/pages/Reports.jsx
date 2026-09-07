@@ -1978,7 +1978,7 @@ export default function Reports() {
                     {emailSending?'Sending…':'Send Report'}
                   </button>
                   {emailResult && (
-                    <p className={`text-xs px-2 py-1.5 rounded-lg ${emailResult.ok?'text-emerald-300 bg-emerald-900/20 border border-emerald-700/40':'text-red-300 bg-red-900/20 border border-red-700/40'}`}>
+                    <p className={`text-xs px-2 py-1.5 rounded-lg ${emailResult.ok?'tone-badge-good':'tone-badge-bad'}`}>
                       {emailResult.msg}
                     </p>
                   )}
@@ -2007,8 +2007,8 @@ export default function Reports() {
               {['pdf','excel','email'].map(fmt => (
                 <button key={fmt} onClick={()=>setKpi44PGFormat(fmt)}
                   className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all capitalize"
-                  style={kpi44PGFormat===fmt?{background:'#d4a843',color:'#0f1f36'}:{background:'rgba(255,255,255,0.05)',color:'rgba(148,163,184,0.8)',border:'1px solid rgba(255,255,255,0.1)'}}>
-                  {fmt==='pdf'?'📄 PDF':fmt==='excel'?'📊 Excel':'📧 Email'}
+                  style={kpi44PGFormat===fmt?{background:'var(--gold-accent)',color:'var(--on-gold)'}:{background:'var(--card)',color:'var(--ink-faint)',border:'1px solid var(--card-brd)'}}>
+                  {fmt==='pdf'?'PDF':fmt==='excel'?'Excel':'Email'}
                 </button>
               ))}
             </div>
@@ -2022,7 +2022,7 @@ export default function Reports() {
                     {kpi44PGSending?<Loader2 size={13} className="animate-spin"/>:'Send'}
                   </button>
                 </div>
-                {kpi44PGMsg&&<p className={`text-xs ${kpi44PGMsg.startsWith('✓')?'text-emerald-400':'text-red-400'}`}>{kpi44PGMsg}</p>}
+                {kpi44PGMsg&&<p className={`text-xs ${kpi44PGMsg.startsWith('✓')?'tone-text-good':'tone-text-bad'}`}>{kpi44PGMsg}</p>}
               </div>
             ):(
               <button onClick={kpi44PGFormat==='pdf'?generateKPI44PGReport:generateKPI44PGExcel}
@@ -2045,8 +2045,8 @@ export default function Reports() {
               {['pdf','excel','email'].map(fmt => (
                 <button key={fmt} onClick={()=>setKpi44UGFormat(fmt)}
                   className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all capitalize"
-                  style={kpi44UGFormat===fmt?{background:'#d4a843',color:'#0f1f36'}:{background:'rgba(255,255,255,0.05)',color:'rgba(148,163,184,0.8)',border:'1px solid rgba(255,255,255,0.1)'}}>
-                  {fmt==='pdf'?'📄 PDF':fmt==='excel'?'📊 Excel':'📧 Email'}
+                  style={kpi44UGFormat===fmt?{background:'var(--gold-accent)',color:'var(--on-gold)'}:{background:'var(--card)',color:'var(--ink-faint)',border:'1px solid var(--card-brd)'}}>
+                  {fmt==='pdf'?'PDF':fmt==='excel'?'Excel':'Email'}
                 </button>
               ))}
             </div>
@@ -2060,7 +2060,7 @@ export default function Reports() {
                     {kpi44UGSending?<Loader2 size={13} className="animate-spin"/>:'Send'}
                   </button>
                 </div>
-                {kpi44UGMsg&&<p className={`text-xs ${kpi44UGMsg.startsWith('✓')?'text-emerald-400':'text-red-400'}`}>{kpi44UGMsg}</p>}
+                {kpi44UGMsg&&<p className={`text-xs ${kpi44UGMsg.startsWith('✓')?'tone-text-good':'tone-text-bad'}`}>{kpi44UGMsg}</p>}
               </div>
             ):(
               <button onClick={kpi44UGFormat==='pdf'?generateKPI44UGReport:generateKPI44UGExcel}
@@ -2103,7 +2103,7 @@ export default function Reports() {
                 <button key={fmt} onClick={()=>setExaminerFormat(fmt)}
                   className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all capitalize"
                   style={examinerFormat===fmt?{background:'#7C3AED',color:'#fff'}:{background:'rgba(255,255,255,0.05)',color:'rgba(148,163,184,0.8)',border:'1px solid rgba(255,255,255,0.1)'}}>
-                  {fmt==='pdf'?'📄 PDF':fmt==='excel'?'📊 Excel':'📧 Email'}
+                  {fmt==='pdf'?'PDF':fmt==='excel'?'Excel':'Email'}
                 </button>
               ))}
             </div>
@@ -2119,7 +2119,7 @@ export default function Reports() {
                     {examinerSending?<Loader2 size={13} className="animate-spin"/>:'Send'}
                   </button>
                 </div>
-                {examinerMsg&&<p className={`text-xs ${examinerMsg.startsWith('✓')?'text-emerald-400':'text-red-400'}`}>{examinerMsg}</p>}
+                {examinerMsg&&<p className={`text-xs ${examinerMsg.startsWith('✓')?'tone-text-good':'tone-text-bad'}`}>{examinerMsg}</p>}
               </div>
             ):(
               <button
