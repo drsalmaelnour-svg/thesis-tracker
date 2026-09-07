@@ -1,46 +1,34 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { getSession, isAdmin } from '../lib/auth'
 
-const DEFAULT_THEME = { primary: '#1e3a5f', accent: '#d4a843', bg: '#f1f5f9' }
+// The sidebar stays a constant dark espresso rail regardless of the
+// content-area theme — its labels are hardcoded light text and would be
+// illegible against the ivory theme otherwise.
+const SIDEBAR_THEME = { primary: '#180f0a', accent: '#e8bf5a' }
 
-const DEPT_THEMES = {
-  'Medical Laboratory Sciences': { primary:'#1e3a5f', accent:'#d4a843', bg:'#f1f5f9' },
-}
-
-const ThemeContext = createContext(DEFAULT_THEME)
-const ColorModeContext = createContext({ mode:'dark', toggleMode:()=>{} })
+const ThemeContext = createContext(SIDEBAR_THEME)
+const ColorModeContext = createContext({ mode: 'brown', toggleMode: () => {} })
 
 export function useTheme()     { return useContext(ThemeContext) }
 export function useColorMode() { return useContext(ColorModeContext) }
 
-export function ThemeProvider({ children, viewingDept }) {
-  const [theme, setTheme] = useState(DEFAULT_THEME)
-  const [mode, setMode]   = useState(() => localStorage.getItem('tcs_color_mode') || 'dark')
-  const session = getSession()
+export function ThemeProvider({ children }) {
+  const [mode, setMode] = useState(() => {
+    const stored = localStorage.getItem('tcs_color_mode')
+    return stored === 'ivory' || stored === 'brown' ? stored : 'brown'
+  })
 
-  // Apply data-theme to document root
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', mode)
     localStorage.setItem('tcs_color_mode', mode)
   }, [mode])
 
-  useEffect(() => {
-    let t = DEFAULT_THEME
-    if (viewingDept) {
-      t = DEPT_THEMES[viewingDept] || DEFAULT_THEME
-    } else if (!isAdmin() && session?.department?.name) {
-      t = DEPT_THEMES[session.department.name] || DEFAULT_THEME
-    }
-    setTheme(t)
-  }, [viewingDept, session?.department?.name])
-
   function toggleMode() {
-    setMode(prev => prev === 'dark' ? 'light' : 'dark')
+    setMode(prev => prev === 'brown' ? 'ivory' : 'brown')
   }
 
   return (
     <ColorModeContext.Provider value={{ mode, toggleMode }}>
-      <ThemeContext.Provider value={theme}>
+      <ThemeContext.Provider value={SIDEBAR_THEME}>
         {children}
       </ThemeContext.Provider>
     </ColorModeContext.Provider>

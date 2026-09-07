@@ -10,7 +10,6 @@ import {
   getStudentsWithProgress, getSupervisorCheckins,
   getStudentCheckins, getRecentActivity, MILESTONES
 } from '../lib/supabase'
-import { MilestoneBar } from '../components/MilestoneProgress'
 import EmailModal from '../components/EmailModal'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -22,21 +21,61 @@ const ACTIVITY_ICONS = {
   reminder:  { icon: Bell,          color: 'text-orange-400',  bg: 'bg-orange-500/10'  },
 }
 
-function ActionCard({ icon: Icon, label, value, sub, color, to, alert }) {
-  const card = (
-    <div className={`card p-5 hover:border-gold-500/30 transition-all group ${alert ? 'border-red-700/50' : ''}`}>
-      <div className="flex items-start justify-between mb-3">
-        <div className={`p-2.5 rounded-xl ${color}`}>
-          <Icon size={18} />
-        </div>
-        {alert && <span className="w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse" />}
+function MinorStat({ icon: Icon, value, label, tint }) {
+  return (
+    <div className="flex items-center gap-3.5 px-6 first:pl-0 last:pr-0" style={{borderRight:'1px solid var(--hair)'}}>
+      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{background:`${tint}22`, color:tint}}>
+        <Icon size={16}/>
       </div>
-      <p className={`text-3xl font-display font-bold ${alert && value > 0 ? 'text-red-300' : 'text-slate-100'}`}>{value}</p>
-      <p className="text-xs font-medium text-slate-400 mt-1">{label}</p>
-      {sub && <p className="text-xs text-navy-500 mt-0.5">{sub}</p>}
+      <div>
+        <p className="font-display text-2xl font-medium leading-none" style={{color:'var(--ink)'}}>{value}</p>
+        <p className="text-[11px] mt-1.5 max-w-[100px] leading-tight" style={{color:'var(--ink-faint)'}}>{label}</p>
+      </div>
     </div>
   )
-  return to ? <Link to={to}>{card}</Link> : card
+}
+
+// Ledger hero band — one headline figure + supporting stats, replaces the
+// generic 5-identical-cards grid.
+function Ledger({ needsAttention, completedThisWeek, pendingSupCheckins, nearCompletion, total, onNeedsAttention }) {
+  return (
+    <div className="relative rounded-[22px] p-8 mb-8 flex items-stretch overflow-hidden card"
+      style={{boxShadow:'0 30px 55px -30px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)'}}>
+      <div className="absolute w-[340px] h-[340px] rounded-full pointer-events-none"
+        style={{left:-90, top:-140, background:'radial-gradient(circle, rgba(226,90,90,0.16), transparent 70%)'}}/>
+      <button onClick={onNeedsAttention}
+        className="text-left pr-9 mr-9 relative z-10 shrink-0" style={{borderRight:'1px solid var(--hair)'}}>
+        <p className="font-display font-medium leading-none" style={{fontSize:56, color:'#e25a5a', filter:'drop-shadow(0 2px 18px rgba(226,90,90,0.25))'}}>
+          {needsAttention}
+        </p>
+        <p className="text-[13px] font-medium mt-2.5" style={{color:'var(--ink)'}}>Need attention</p>
+        <p className="text-[11px] mt-0.5" style={{color:'var(--ink-faint)'}}>Overdue or flagged in check-ins</p>
+      </button>
+      <div className="flex-1 flex items-center justify-between relative z-10">
+        <MinorStat icon={CheckCircle2}  value={completedThisWeek}  label="Completed this week"          tint="#5fa3a3"/>
+        <MinorStat icon={Calendar}      value={pendingSupCheckins} label="Awaiting supervisor check-in"  tint="#e8bf5a"/>
+        <MinorStat icon={GraduationCap} value={nearCompletion}     label="Near completion"               tint="#c7ae8a"/>
+        <MinorStat icon={Users}         value={total}              label="Total students"                tint="#f0d080"/>
+      </div>
+    </div>
+  )
+}
+
+// Circular progress ring — replaces the flat bar, one glance shows status.
+function ProgressRing({ done, totalCount, flagged }) {
+  const r = 18, circ = 2 * Math.PI * r
+  const offset = circ - (totalCount ? done / totalCount : 0) * circ
+  const stroke = flagged ? '#e25a5a' : done >= totalCount ? '#e8bf5a' : '#5fa3a3'
+  return (
+    <div className="relative w-[42px] h-[42px] shrink-0">
+      <svg width="42" height="42" viewBox="0 0 42 42" style={{transform:'rotate(-90deg)'}}>
+        <circle cx="21" cy="21" r={r} fill="none" stroke="var(--hair)" strokeWidth="3"/>
+        <circle cx="21" cy="21" r={r} fill="none" stroke={stroke} strokeWidth="3" strokeLinecap="round"
+          strokeDasharray={circ} strokeDashoffset={offset}
+          style={{transition:'stroke-dashoffset 0.6s ease'}}/>
+      </svg>
+    </div>
+  )
 }
 
 function CohortRing({ rate, label, count, onClick }) {
@@ -47,19 +86,19 @@ function CohortRing({ rate, label, count, onClick }) {
       title={`View ${label} students`}>
       <div className="relative w-20 h-20 transition-transform group-hover:scale-110">
         <svg width="80" height="80" viewBox="0 0 80 80">
-          <circle cx="40" cy="40" r={r} fill="none" stroke="#1e3a5f" strokeWidth="8" />
-          <circle cx="40" cy="40" r={r} fill="none" stroke="#d4a843" strokeWidth="8"
+          <circle cx="40" cy="40" r={r} fill="none" stroke="var(--hair)" strokeWidth="8" />
+          <circle cx="40" cy="40" r={r} fill="none" stroke="#e8bf5a" strokeWidth="8"
             strokeDasharray={circ} strokeDashoffset={offset}
             strokeLinecap="round" transform="rotate(-90 40 40)"
             style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-sm font-bold text-gold-300">{rate}%</span>
+          <span className="text-sm font-bold" style={{color:'var(--gold-accent)'}}>{rate}%</span>
         </div>
       </div>
-      <p className="text-xs font-semibold text-slate-300 group-hover:text-gold-400 transition-colors">{label}</p>
-      <p className="text-xs text-navy-500">{count} students</p>
-      <p className="text-xs text-navy-600 group-hover:text-gold-500 transition-colors">View →</p>
+      <p className="text-xs font-semibold" style={{color:'var(--ink-dim)'}}>{label}</p>
+      <p className="text-xs" style={{color:'var(--ink-faint)'}}>{count} students</p>
+      <p className="text-xs" style={{color:'var(--ink-faint)'}}>View →</p>
     </div>
   )
 }
@@ -86,7 +125,6 @@ export default function Dashboard() {
       ])
       setStudents(s); setSupCheckins(sc); setStuCheckins(stc); setActivity(act)
 
-      // Load KPI 4.4 impact data
       try {
         const { supabase } = await import('../lib/supabase')
         let q = supabase.from('research_impact').select('id,student_id,status,submitted_at,supervisor_confirmed,has_publication,has_ip,has_industry_partner,has_public_events,has_policy_citation,has_commercialisation,no_impact,academic_year')
@@ -100,7 +138,6 @@ export default function Dashboard() {
 
   useEffect(() => { load() }, [effectiveDeptId, effectiveProgLevel, viewingDept, viewingLevel])
 
-  // ── Stats ─────────────────────────────────────────────────────────────────
   const needsAttention = students.filter(s =>
     (s.student_milestones||[]).some(m=>m.status==='overdue') ||
     stuCheckins.find(c=>c.student_id===s.id&&c.overall_status==='struggling') ||
@@ -121,7 +158,6 @@ export default function Dashboard() {
     return done >= MILESTONES.length - 1 && done < MILESTONES.length
   }).length
 
-  // ── Cohort snapshots ──────────────────────────────────────────────────────
   const cohortYears = [...new Set(students.map(s=>s.enrollment_year).filter(Boolean))].sort((a,b)=>b-a)
   const cohortStats = cohortYears.map(year => {
     const cohortStudents = students.filter(s=>s.enrollment_year===year)
@@ -135,7 +171,6 @@ export default function Dashboard() {
     }
   })
 
-  // ── Upcoming (overdue) milestones ─────────────────────────────────────────
   const overdueItems = students
     .flatMap(s => (s.student_milestones||[])
       .filter(m=>m.status==='overdue')
@@ -145,11 +180,10 @@ export default function Dashboard() {
   return (
     <div className="p-8 space-y-6 fade-in">
 
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-display text-3xl font-semibold text-slate-100">Dashboard</h1>
-          <p className="text-navy-400 mt-1">
+          <h1 className="font-display text-3xl font-semibold" style={{color:'var(--ink)'}}>Dashboard</h1>
+          <p className="mt-1" style={{color:'var(--ink-faint)'}}>
             {new Date().toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}
           </p>
         </div>
@@ -158,57 +192,51 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Action stat cards */}
-      <div className="grid grid-cols-5 gap-4">
-        <ActionCard icon={AlertCircle}   label="Needs Attention"       value={needsAttention}     color="bg-red-500/10 text-red-400"     to="/students"  alert={needsAttention>0} />
-        <ActionCard icon={CheckCircle2}  label="Completed This Week"   value={completedThisWeek}  color="bg-emerald-500/10 text-emerald-400" to="/students" />
-        <ActionCard icon={ClipboardList} label="Awaiting Sup Check-in" value={pendingSupCheckins}  color="bg-amber-500/10 text-amber-400"  to="/checkins" />
-        <ActionCard icon={GraduationCap} label="Near Completion"       value={nearCompletion}      color="bg-blue-500/10 text-blue-400"    to="/students" />
-        <ActionCard icon={Users}         label="Total Students"        value={students.length}     color="bg-gold-500/10 text-gold-400"    to="/students" />
-      </div>
+      <Ledger
+        needsAttention={needsAttention}
+        completedThisWeek={completedThisWeek}
+        pendingSupCheckins={pendingSupCheckins}
+        nearCompletion={nearCompletion}
+        total={students.length}
+        onNeedsAttention={() => navigate('/students')}
+      />
 
-      {/* Cohort snapshot */}
       {cohortStats.length > 0 && (
         <div className="card p-5">
-          <h2 className="font-display font-semibold text-slate-100 mb-5 flex items-center gap-2">
-            <TrendingUp size={17} className="text-gold-400" /> Cohort Progress
+          <h2 className="font-display font-semibold mb-5 flex items-center gap-2" style={{color:'var(--ink)'}}>
+            <TrendingUp size={17} style={{color:'var(--gold-accent)'}} /> Cohort Progress
           </h2>
           <div className="flex items-center gap-12 flex-wrap">
             {cohortStats.map(c => (
               <CohortRing key={c.year} rate={c.rate} label={`${c.year} Cohort`} count={c.total}
                 onClick={() => navigate({ pathname: '/students', search: `?cohort=${c.year}` })} />
             ))}
-            {cohortStats.length === 0 && (
-              <p className="text-sm text-navy-500">No cohort data yet.</p>
-            )}
           </div>
         </div>
       )}
 
-      {/* Main 3-column grid */}
       <div className="grid grid-cols-3 gap-6">
 
-        {/* Student list — 2 cols */}
         <div className="col-span-2 card p-5">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="font-display font-semibold text-slate-100">Students</h2>
-            <Link to="/students" className="text-xs text-gold-400 hover:text-gold-300 flex items-center gap-1">
+            <h2 className="font-display font-semibold" style={{color:'var(--ink)'}}>Students</h2>
+            <Link to="/students" className="text-xs flex items-center gap-1" style={{color:'var(--gold-accent)'}}>
               View all <ArrowRight size={12} />
             </Link>
           </div>
 
           {loading ? (
             <div className="space-y-3">
-              {[1,2,3,4].map(i=><div key={i} className="h-16 rounded-xl bg-navy-800/40 shimmer"/>)}
+              {[1,2,3,4].map(i=><div key={i} className="h-16 rounded-xl shimmer" style={{background:'var(--card)'}}/>)}
             </div>
           ) : students.length === 0 ? (
-            <div className="text-center py-12 text-navy-500">
+            <div className="text-center py-12" style={{color:'var(--ink-faint)'}}>
               <Users size={32} className="mx-auto mb-3 opacity-40"/>
               <p className="text-sm">No students yet.</p>
               <Link to="/students" className="btn-primary mt-4 inline-flex"><Users size={14}/>Add Students</Link>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div>
               {students.slice(0,8).map(student => {
                 const milestones  = student.student_milestones || []
                 const done        = milestones.filter(m=>m.status==='completed').length
@@ -216,26 +244,27 @@ export default function Dashboard() {
                 const isStruggling = stuCheckins.find(c=>c.student_id===student.id&&c.overall_status==='struggling')
                 const supUrgent   = supCheckins.find(c=>c.student_id===student.id&&c.engagement_status==='urgent')
                 const flagged     = hasOverdue || isStruggling || supUrgent
+                const currentMilestone = MILESTONES.find(m => !milestones.find(sm=>sm.milestone_id===m.id && sm.status==='completed'))
 
                 return (
                   <div key={student.id}
-                    className={`flex items-center gap-3 p-3 rounded-xl border transition-all group ${
-                      flagged ? 'border-red-700/30 bg-red-900/5' : 'border-navy-700/20 hover:bg-navy-800/30'
-                    }`}>
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 ${
-                      flagged ? 'bg-red-900/40 text-red-300' : 'bg-navy-700 text-gold-400'
-                    }`}>
-                      {student.name.charAt(0).toUpperCase()}
-                    </div>
+                    className="rise-in flex items-center gap-4 p-3 -mx-3 rounded-xl transition-all group"
+                    style={{background: flagged ? 'rgba(226,90,90,0.05)' : 'transparent'}}>
+                    <ProgressRing done={done} totalCount={MILESTONES.length} flagged={flagged}/>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="text-sm font-medium text-slate-200 truncate">{student.name}</p>
-                        {flagged && <AlertCircle size={12} className="text-red-400 shrink-0"/>}
-                        <span className="text-xs text-navy-500 shrink-0">{done}/{MILESTONES.length}</span>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="text-sm font-medium truncate" style={{color:'var(--ink)'}}>{student.name}</p>
+                        {flagged && <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium"
+                          style={{color:'#e25a5a', background:'rgba(226,90,90,0.12)', border:'1px solid rgba(226,90,90,0.2)'}}>overdue</span>}
                       </div>
-                      <MilestoneBar studentMilestones={milestones}/>
+                      <p className="text-xs truncate" style={{color:'var(--ink-faint)'}}>
+                        {done >= MILESTONES.length
+                          ? <>All milestones complete — <span style={{color:'var(--ink-dim)'}}>thesis submitted</span></>
+                          : <>{hasOverdue ? 'Stalled at' : 'In progress on'} <span style={{color:'var(--ink-dim)'}}>{currentMilestone?.name}</span></>
+                        }
+                      </p>
                     </div>
-                    {/* Quick actions */}
+                    <span className="font-display text-xs shrink-0" style={{color:'var(--ink-dim)'}}>{done}/{MILESTONES.length}</span>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                       <button
                         onClick={() => setEmailStudent(student)}
@@ -250,7 +279,7 @@ export default function Dashboard() {
                 )
               })}
               {students.length > 8 && (
-                <Link to="/students" className="block text-center text-xs text-navy-400 hover:text-gold-400 pt-2">
+                <Link to="/students" className="block text-center text-xs pt-3" style={{color:'var(--ink-faint)'}}>
                   +{students.length-8} more students →
                 </Link>
               )}
@@ -258,27 +287,28 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Right column */}
         <div className="space-y-4">
 
-          {/* Overdue alerts */}
           <div className="card p-5">
-            <h2 className="font-display font-semibold text-slate-100 mb-4 flex items-center gap-2">
+            <h2 className="font-display font-semibold mb-4 flex items-center gap-2" style={{color:'var(--ink)'}}>
               <AlertCircle size={15} className="text-red-400"/> Overdue Milestones
             </h2>
             {overdueItems.length === 0 ? (
               <div className="flex items-center gap-2 text-emerald-400/70 text-sm">
-                <CheckCircle2 size={15}/> All on track 🎉
+                <CheckCircle2 size={15}/> All on track
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {overdueItems.map(({student, milestone}, i) => (
                   <Link key={i} to={`/students/${student.id}`}
-                    className="flex items-center gap-2 p-2 rounded-lg hover:bg-red-900/10 transition-all group">
-                    <span className="text-sm">{milestone?.icon}</span>
+                    className="flex items-center gap-3 p-2 -mx-2 rounded-lg transition-all group">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                      style={{background:'rgba(226,90,90,0.10)', border:'1px solid rgba(226,90,90,0.2)'}}>
+                      <span className="text-sm">{milestone?.icon}</span>
+                    </div>
                     <div className="min-w-0">
-                      <p className="text-xs font-medium text-slate-300 truncate group-hover:text-red-300">{student.name}</p>
-                      <p className="text-xs text-navy-500 truncate">{milestone?.name}</p>
+                      <p className="text-xs font-medium truncate" style={{color:'var(--ink)'}}>{student.name}</p>
+                      <p className="text-xs truncate" style={{color:'var(--ink-faint)'}}>{milestone?.name}</p>
                     </div>
                   </Link>
                 ))}
@@ -286,13 +316,12 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Activity feed */}
           <div className="card p-5">
-            <h2 className="font-display font-semibold text-slate-100 mb-4 flex items-center gap-2">
-              <Clock size={15} className="text-gold-400"/> Recent Activity
+            <h2 className="font-display font-semibold mb-4 flex items-center gap-2" style={{color:'var(--ink)'}}>
+              <Clock size={15} style={{color:'var(--gold-accent)'}}/> Recent Activity
             </h2>
             {activity.length === 0 ? (
-              <p className="text-sm text-navy-500">No recent activity.</p>
+              <p className="text-sm" style={{color:'var(--ink-faint)'}}>No recent activity.</p>
             ) : (
               <div className="space-y-3 max-h-64 overflow-y-auto">
                 {activity.map(a => {
@@ -304,9 +333,9 @@ export default function Dashboard() {
                         <Icon size={12} className={cfg.color}/>
                       </div>
                       <div className="min-w-0">
-                        <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">{a.description}</p>
-                        <p className="text-xs text-navy-500 mt-0.5">
-                          {a.students?.name && <span className="text-navy-400">{a.students.name} · </span>}
+                        <p className="text-xs leading-relaxed line-clamp-2" style={{color:'var(--ink-dim)'}}>{a.description}</p>
+                        <p className="text-xs mt-0.5" style={{color:'var(--ink-faint)'}}>
+                          {a.students?.name && <span>{a.students.name} · </span>}
                           {formatDistanceToNow(new Date(a.created_at), {addSuffix:true})}
                         </p>
                       </div>

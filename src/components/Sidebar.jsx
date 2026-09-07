@@ -147,15 +147,15 @@ export default function Sidebar({ setViewingLevel, viewingLevel }) {
             </span>
           )}
         </div>
-        {/* Light/Dark mode toggle */}
+        {/* Theme toggle */}
         <button onClick={toggleMode}
           className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs transition-all mb-1"
           style={{color:'rgba(255,255,255,0.5)'}}
           onMouseEnter={e=>{e.currentTarget.style.color='rgba(255,255,255,0.9)';e.currentTarget.style.background='rgba(255,255,255,0.08)'}}
           onMouseLeave={e=>{e.currentTarget.style.color='rgba(255,255,255,0.5)';e.currentTarget.style.background='transparent'}}>
-          {mode==='dark'
-            ? <><Sun size={13}/> Switch to Light Mode</>
-            : <><Moon size={13}/> Switch to Dark Mode</>}
+          {mode==='brown'
+            ? <><Sun size={13}/> Switch to Ivory Gold</>
+            : <><Moon size={13}/> Switch to Dark Brown</>}
         </button>
 
         <button onClick={handleLogout}
