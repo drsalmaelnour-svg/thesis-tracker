@@ -190,12 +190,12 @@ export default function Analytics() {
 
           {/* Bottleneck */}
           {bottleneck && (
-            <div className="card p-5 border-amber-700/30 bg-amber-900/5">
-              <h2 className="font-display font-semibold text-slate-100 mb-2 text-sm flex items-center gap-2">
-                <AlertCircle size={14} className="text-amber-400"/> Bottleneck
+            <div className="card p-5" style={{borderLeft:'3px solid var(--status-warn-fg)'}}>
+              <h2 className="font-display font-semibold mb-2 text-sm flex items-center gap-2" style={{color:'var(--ink)'}}>
+                <AlertCircle size={14} className="tone-text-warn"/> Bottleneck
               </h2>
-              <p className="text-xs text-navy-400 mb-1">Lowest completion rate:</p>
-              <p className="text-sm font-medium text-amber-300">{bottleneck.icon} {bottleneck.name}</p>
+              <p className="text-xs mb-1" style={{color:'var(--ink-faint)'}}>Lowest completion rate:</p>
+              <p className="text-sm font-medium tone-text-warn">{bottleneck.icon} {bottleneck.name}</p>
               <p className="text-xs text-navy-400 mt-1">{bottleneck.rate}% · {bottleneck.completed}/{total} students</p>
             </div>
           )}

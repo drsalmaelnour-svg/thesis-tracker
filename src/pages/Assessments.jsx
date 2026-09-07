@@ -682,7 +682,7 @@ function ExaminersTab({ externals, supervisors, onRefresh }) {
       </div>
 
       {importMsg && (
-        <div className={`p-3 rounded-xl border text-sm flex items-center gap-2 ${importMsg.error?'bg-red-900/20 border-red-700/40 text-red-300':'bg-emerald-900/20 border-emerald-700/40 text-emerald-300'}`}>
+        <div className={`p-3 rounded-xl text-sm flex items-center gap-2 ${importMsg.error?'tone-badge-bad':'tone-badge-good'}`}>
           <CheckCircle2 size={13}/> Imported {importMsg.added} examiners{importMsg.failed>0?` · ${importMsg.failed} skipped`:''}
         </div>
       )}
@@ -1098,7 +1098,7 @@ Gulf Medical University`)
 
   function StatusMsg({ ok, msg }) {
     return (
-      <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg ${ok?'bg-emerald-900/20 text-emerald-300 border border-emerald-700/40':'bg-red-900/20 text-red-300 border border-red-700/40'}`}>
+      <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg ${ok?'tone-badge-good':'tone-badge-bad'}`}>
         {ok?<CheckCircle2 size={12}/>:<AlertCircle size={12}/>} {msg}
       </div>
     )
@@ -1165,7 +1165,7 @@ Gulf Medical University`)
             </div>
           )}
           {needsExternal && (
-            <div className="flex items-start gap-2 px-2 py-2 rounded-xl bg-amber-900/10 border border-amber-700/20">
+            <div className="flex items-start gap-2 px-2 py-2 rounded-xl tone-badge-warn">
               <Info size={11} className="text-amber-400 shrink-0 mt-0.5"/>
               <p className="text-xs text-amber-300/80">Requires 1 internal + 1 external</p>
             </div>
@@ -1286,11 +1286,11 @@ Gulf Medical University`)
                     <td className="px-4 py-2.5 text-slate-300">{a1?getExaminerName(a1):<span className="text-navy-600">—</span>}</td>
                     <td className="px-4 py-2.5 text-slate-300">{a2?getExaminerName(a2):<span className="text-navy-600">—</span>}</td>
                     <td className="px-4 py-2.5">
-                      <span className={`px-2 py-0.5 rounded-lg border font-medium ${
-                        status==='assigned'?'bg-emerald-900/20 border-emerald-700/40 text-emerald-300':
-                        status==='partial' ?'bg-amber-900/20 border-amber-700/40 text-amber-300':
-                        'bg-navy-800/40 border-navy-700/40 text-navy-400'
-                      }`}>{status==='assigned'?'✓ Assigned':status==='partial'?'⚠ Partial':'— None'}</span>
+                      <span className={`px-2 py-0.5 rounded-lg font-medium ${
+                        status==='assigned'?'tone-badge-good':
+                        status==='partial' ?'tone-badge-warn':
+                        'badge-pending'
+                      }`}>{status==='assigned'?'Assigned':status==='partial'?'Partial':'None'}</span>
                     </td>
                     <td className="px-4 py-2.5">
                       <div className="flex gap-1">
@@ -1298,8 +1298,8 @@ Gulf Medical University`)
                           const isDefBefore = asgn.assessment_type==='defense_before'
                           return (
                             <button key={ai} onClick={()=>openEmail(asgn,isDefBefore||isCombined)}
-                              className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-all ${
-                                asgn.email_sent_at?'border-emerald-700/40 text-emerald-400 bg-emerald-900/10':'btn-secondary'
+                              className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-all ${
+                                asgn.email_sent_at?'tone-badge-good':'btn-secondary'
                               }`}>
                               <Send size={10}/> E{ai+1}
                               {(isDefBefore||isCombined)&&<span className="text-gold-400/70">×2</span>}
@@ -1376,7 +1376,7 @@ Gulf Medical University`)
                   value={emailBody} onChange={e=>setEmailBody(e.target.value)}/>
               </div>
               {emailSent && (
-                <div className="flex items-center gap-2 text-xs text-emerald-300 bg-emerald-900/20 border border-emerald-700/40 px-3 py-2 rounded-lg">
+                <div className="flex items-center gap-2 text-xs tone-badge-good px-3 py-2 rounded-lg">
                   <CheckCircle2 size={12}/> Sent to {emailModal.email}
                 </div>
               )}
@@ -1646,7 +1646,7 @@ Gulf Medical University`,
                         {sub.assessment_assignments?.examiner_type === 'external' ? 'External' : 'Internal'}
                       </span>
                       {sub.locked && (
-                        <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-lg border border-amber-700/40 bg-amber-900/20 text-amber-300">
+                        <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-lg tone-badge-warn">
                           <Lock size={10}/> Locked
                         </span>
                       )}
@@ -1661,9 +1661,9 @@ Gulf Medical University`,
                       </div>
                     )}
                     <button onClick={() => handleLock(sub.id, !sub.locked)} disabled={locking===sub.id}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
                         sub.locked
-                          ? 'border-amber-700/40 bg-amber-900/10 text-amber-300 hover:bg-amber-900/20'
+                          ? 'tone-badge-warn'
                           : 'btn-secondary'
                       }`}>
                       {locking===sub.id ? <Loader2 size={12} className="animate-spin"/> :
@@ -1704,11 +1704,11 @@ Gulf Medical University`,
                     {Object.entries(sub.checklist.checks).map(([item, val]) => (
                       <div key={item} className="flex items-start gap-2 text-xs">
                         <span className={`shrink-0 mt-0.5 px-1.5 py-0.5 rounded font-bold ${
-                          val==='ok'?'bg-emerald-900/20 text-emerald-400':'bg-red-900/20 text-red-400'
+                          val==='ok'?'tone-text-good':'tone-text-bad'
                         }`}>{val==='ok'?'✓':'✗'}</span>
                         <span className="text-slate-300">{item}</span>
                         {sub.checklist.notes?.[item] && (
-                          <span className="text-red-300/70 ml-1">— {sub.checklist.notes[item]}</span>
+                          <span className="tone-text-bad ml-1">— {sub.checklist.notes[item]}</span>
                         )}
                       </div>
                     ))}
@@ -1760,7 +1760,7 @@ Gulf Medical University`,
             </div>
             {emailResult && (
               <div className={`mt-3 flex items-center gap-2 text-xs px-3 py-2 rounded-lg ${
-                emailResult.ok?'bg-emerald-900/20 text-emerald-300 border border-emerald-700/40':'bg-red-900/20 text-red-300 border border-red-700/40'
+                emailResult.ok?'tone-badge-good':'tone-badge-bad'
               }`}>
                 {emailResult.ok?<CheckCircle2 size={12}/>:<AlertCircle size={12}/>} {emailResult.msg}
               </div>

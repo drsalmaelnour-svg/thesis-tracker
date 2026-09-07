@@ -377,11 +377,11 @@ export default function Groups() {
 
       {/* Ungrouped warning */}
       {ungrouped.length>0 && (
-        <div className="card p-4 border border-amber-500/20 bg-amber-900/5">
-          <p className="text-xs font-semibold text-amber-400 mb-2">⚠ {ungrouped.length} undergraduate student{ungrouped.length>1?'s':''} not in a group</p>
+        <div className="card p-4" style={{borderLeft:'3px solid var(--status-warn-fg)'}}>
+          <p className="text-xs font-semibold tone-text-warn mb-2">⚠ {ungrouped.length} undergraduate student{ungrouped.length>1?'s':''} not in a group</p>
           <div className="flex flex-wrap gap-2">
             {ungrouped.map(s=>(
-              <span key={s.id} className="px-2 py-1 rounded-lg text-xs bg-navy-800/40 text-navy-300">{s.name}</span>
+              <span key={s.id} className="px-2 py-1 rounded-lg text-xs" style={{background:'var(--card-hover)', color:'var(--ink-dim)'}}>{s.name}</span>
             ))}
           </div>
         </div>
@@ -545,9 +545,8 @@ export default function Groups() {
                       </p>
                       <div className="space-y-2">
                         {(group.students||[]).map(student=>(
-                          <div key={student.id} className={`rounded-xl border overflow-hidden transition-all ${
-                            selected.has(student.id)?'border-red-500/40 bg-red-900/10':'border-navy-700/30 bg-navy-800/30'
-                          }`}>
+                          <div key={student.id} className="rounded-xl overflow-hidden transition-all card"
+                            style={selected.has(student.id)?{background:'var(--status-bad-bg)', borderColor:'var(--status-bad-brd)'}:{}}>
                             {editingStudent===student.id?(
                               <div className="p-3 space-y-2">
                                 <div className="grid grid-cols-2 gap-2">

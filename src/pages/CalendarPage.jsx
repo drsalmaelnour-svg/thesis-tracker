@@ -193,7 +193,7 @@ export default function CalendarPage() {
       </div>
 
       {sendResult && (
-        <div className="p-3 rounded-xl bg-emerald-900/20 border border-emerald-700/40 text-emerald-300 text-sm">
+        <div className="p-3 rounded-xl tone-badge-good text-sm">
           ✓ {sendResult}
         </div>
       )}

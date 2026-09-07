@@ -85,7 +85,7 @@ export default function Deadlines() {
       </div>
 
       {saved==='all' && (
-        <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-900/20 border border-emerald-700/40 text-emerald-300 text-sm">
+        <div className="flex items-center gap-2 p-3 rounded-xl tone-badge-good text-sm">
           <CheckCircle2 size={15}/> All deadlines saved for {activeCohort} cohort
         </div>
       )}
@@ -116,7 +116,7 @@ export default function Deadlines() {
                   <button onClick={()=>saveMilestone(m.id)}
                     disabled={saving===m.id || !deadlines[m.id]}
                     className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
-                      saved===m.id ? 'bg-emerald-900/20 border-emerald-700/40 text-emerald-300' : 'btn-secondary'
+                      saved===m.id ? 'tone-badge-good' : 'btn-secondary'
                     } disabled:opacity-40`}>
                     {saving===m.id ? <Loader2 size={11} className="animate-spin"/> :
                      saved===m.id  ? <CheckCircle2 size={11}/> : <Save size={11}/>}

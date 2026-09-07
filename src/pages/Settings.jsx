@@ -397,16 +397,16 @@ export default function Settings() {
 
       {/* DB Status */}
       <Section title="Database Connection" icon={Database}>
-        <div className={`flex items-center gap-3 p-4 rounded-xl border ${
-          dbStatus === 'connected' ? 'bg-emerald-900/20 border-emerald-700/40' :
-          dbStatus === 'error'     ? 'bg-red-900/20 border-red-700/40' :
-          'bg-navy-800/40 border-navy-700/40'
+        <div className={`flex items-center gap-3 p-4 rounded-xl ${
+          dbStatus === 'connected' ? 'tone-badge-good' :
+          dbStatus === 'error'     ? 'tone-badge-bad' :
+          'card'
         }`}>
           <div className={`w-2.5 h-2.5 rounded-full ${
-            dbStatus === 'connected' ? 'bg-emerald-400' :
-            dbStatus === 'error'     ? 'bg-red-400' :
+            dbStatus === 'connected' ? '' :
+            dbStatus === 'error'     ? '' :
             'bg-yellow-400 animate-pulse'
-          }`} />
+          }`} style={dbStatus==='connected'?{background:'var(--status-good-fg)'}:dbStatus==='error'?{background:'var(--status-bad-fg)'}:{}} />
           <div>
             <p className="text-sm font-medium text-slate-200">
               {dbStatus === 'connected' ? 'Supabase connected' :
@@ -476,9 +476,7 @@ export default function Settings() {
           {/* Persistent result message */}
           {inviteMsg && (
             <div className={`flex items-start gap-2 px-3 py-2.5 rounded-xl text-xs mb-3 ${
-              inviteMsg.ok
-                ? 'bg-emerald-900/20 border border-emerald-700/40 text-emerald-300'
-                : 'bg-red-900/20 border border-red-700/40 text-red-300'
+              inviteMsg.ok ? 'tone-badge-good' : 'tone-badge-bad'
             }`}>
               {inviteMsg.ok ? <CheckCircle2 size={13} className="shrink-0 mt-0.5"/> : <AlertCircle size={13} className="shrink-0 mt-0.5"/>}
               <p className="leading-relaxed">{inviteMsg.msg}</p>
@@ -649,7 +647,7 @@ export default function Settings() {
       {/* Supervisors */}
       <Section title="Supervisors" icon={Key}>
         {saved === 'supervisor' && (
-          <div className="flex items-center gap-2 text-emerald-300 text-sm mb-4 bg-emerald-900/20 border border-emerald-700/40 rounded-xl p-3">
+          <div className="flex items-center gap-2 text-sm mb-4 tone-badge-good rounded-xl p-3">
             <CheckCircle2 size={15} /> Supervisor added successfully.
           </div>
         )}
