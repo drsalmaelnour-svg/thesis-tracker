@@ -26,6 +26,10 @@
   --badge-progress-bg:#1e3a8acc;  --badge-progress-fg:#93c5fd;  --badge-progress-brd:#1d4ed866;
   --badge-completed-bg:#064e3bcc; --badge-completed-fg:#6ee7b7; --badge-completed-brd:#05966966;
   --badge-overdue-bg:#7f1d1dcc;   --badge-overdue-fg:#fca5a5;   --badge-overdue-brd:#b91c1c66;
+  --status-good-bg: rgba(127,196,191,0.12); --status-good-fg:#7fc4bf; --status-good-brd: rgba(127,196,191,0.28);
+  --status-warn-bg: rgba(232,191,90,0.12);  --status-warn-fg:#e8bf5a; --status-warn-brd: rgba(232,191,90,0.28);
+  --status-bad-bg:  rgba(226,104,92,0.13);  --status-bad-fg:#e2685c; --status-bad-brd: rgba(226,104,92,0.3);
+  --status-info-bg: rgba(92,136,192,0.14);  --status-info-fg:#7fa5d6; --status-info-brd: rgba(92,136,192,0.3);
 }
 
 /* Ivory gold */
@@ -51,6 +55,10 @@
   --badge-progress-bg:#dbeafee6;  --badge-progress-fg:#1d4ed8;  --badge-progress-brd:#93c5fd80;
   --badge-completed-bg:#d1fae5e6; --badge-completed-fg:#065f46; --badge-completed-brd:#6ee7b780;
   --badge-overdue-bg:#fee2e2e6;   --badge-overdue-fg:#991b1b;   --badge-overdue-brd:#fca5a580;
+  --status-good-bg: rgba(47,122,117,0.10);  --status-good-fg:#2f7a75; --status-good-brd: rgba(47,122,117,0.3);
+  --status-warn-bg: rgba(184,134,11,0.10);  --status-warn-fg:#9c7209; --status-warn-brd: rgba(184,134,11,0.32);
+  --status-bad-bg:  rgba(178,58,46,0.10);   --status-bad-fg:#b23a2e; --status-bad-brd: rgba(178,58,46,0.32);
+  --status-info-bg: rgba(47,90,143,0.10);   --status-info-fg:#2f5a8f; --status-info-brd: rgba(47,90,143,0.3);
 }
 
 @layer base {
@@ -118,19 +126,43 @@
   .badge-progress  { background: var(--badge-progress-bg);  color: var(--badge-progress-fg);  border: 1px solid var(--badge-progress-brd); }
   .badge-completed { background: var(--badge-completed-bg); color: var(--badge-completed-fg); border: 1px solid var(--badge-completed-brd); }
   .badge-overdue   { background: var(--badge-overdue-bg);   color: var(--badge-overdue-fg);   border: 1px solid var(--badge-overdue-brd); }
+
+  /* Muted status "tones" — replace raw saturated emerald/amber/red with
+     colors consistent with the brown/ivory palette. */
+  .tone-dot { width:7px; height:7px; border-radius:9999px; display:inline-block; flex-shrink:0; }
+  .tone-dot-good { background: var(--status-good-fg); }
+  .tone-dot-warn { background: var(--status-warn-fg); }
+  .tone-dot-bad  { background: var(--status-bad-fg); }
+  .tone-dot-info { background: var(--status-info-fg); }
+
+  .tone-border-good { border-left: 3px solid var(--status-good-fg); }
+  .tone-border-warn { border-left: 3px solid var(--status-warn-fg); }
+  .tone-border-bad  { border-left: 3px solid var(--status-bad-fg); }
+  .tone-border-info { border-left: 3px solid var(--status-info-fg); }
+
+  .tone-badge-good { background: var(--status-good-bg); color: var(--status-good-fg); border: 1px solid var(--status-good-brd); }
+  .tone-badge-warn { background: var(--status-warn-bg); color: var(--status-warn-fg); border: 1px solid var(--status-warn-brd); }
+  .tone-badge-bad  { background: var(--status-bad-bg);  color: var(--status-bad-fg);  border: 1px solid var(--status-bad-brd); }
+  .tone-badge-info { background: var(--status-info-bg); color: var(--status-info-fg); border: 1px solid var(--status-info-brd); }
+
+  .tone-text-good { color: var(--status-good-fg); }
+  .tone-text-warn { color: var(--status-warn-fg); }
+  .tone-text-bad  { color: var(--status-bad-fg); }
+  .tone-text-info { color: var(--status-info-fg); }
 }
 
 /* ── Route legacy navy/slate/gold utility classes through the theme ─────
    Lets existing pages (Students, Reports, Settings, etc.) pick up the
    active theme without every className needing to be rewritten. */
 [class*="bg-navy-9"], [class*="bg-navy-8"] { background-color: var(--card) !important; border-color: var(--card-brd) !important; }
-[class*="bg-navy-7"]                       { background-color: var(--card-hover) !important; }
-[class*="border-navy-7"], [class*="border-navy-6"] { border-color: var(--card-brd) !important; }
+[class*="bg-navy-7"], [class*="bg-navy-6"] { background-color: var(--card-hover) !important; }
+[class*="border-navy-7"], [class*="border-navy-6"], [class*="border-navy-5"], [class*="border-navy-4"] { border-color: var(--card-brd) !important; }
+[class*="text-navy-2"]                     { color: var(--ink) !important; }
 [class*="text-navy-3"]                     { color: var(--ink) !important; }
-[class*="text-navy-4"], [class*="text-navy-5"], [class*="text-navy-6"] { color: var(--ink-faint) !important; }
+[class*="text-navy-4"], [class*="text-navy-5"], [class*="text-navy-6"], [class*="text-navy-7"] { color: var(--ink-faint) !important; }
 [class*="text-slate-1"], [class*="text-slate-2"] { color: var(--ink) !important; }
 [class*="text-slate-3"], [class*="text-slate-4"] { color: var(--ink-dim) !important; }
-[class*="text-slate-5"], [class*="text-slate-6"] { color: var(--ink-faint) !important; }
+[class*="text-slate-5"], [class*="text-slate-6"], [class*="text-slate-7"] { color: var(--ink-faint) !important; }
 [class*="text-gold"]                       { color: var(--gold-accent) !important; }
 [class*="backdrop-blur"]                   { background: var(--card) !important; }
 input, select, textarea {

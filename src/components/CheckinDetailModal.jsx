@@ -3,15 +3,15 @@ import { X, Shield, Send, Loader2, Edit2, ChevronDown, Save, CheckCircle2 } from
 import { sendStudentEmail, sendSupervisorEmail } from '../lib/emailService'
 
 const STUDENT_STATUS = {
-  on_track:      { label: 'On Track',      emoji: '🟢', color: 'text-emerald-300 bg-emerald-900/20 border-emerald-700/40' },
-  some_concerns: { label: 'Some Concerns', emoji: '🟡', color: 'text-amber-300 bg-amber-900/20 border-amber-700/40'     },
-  struggling:    { label: 'Struggling',    emoji: '🔴', color: 'text-red-300 bg-red-900/20 border-red-700/40'           },
+  on_track:      { label: 'On track',      tone: 'good' },
+  some_concerns: { label: 'Some concerns', tone: 'warn' },
+  struggling:    { label: 'Struggling',    tone: 'bad'  },
 }
 
 const SUPERVISOR_STATUS = {
-  on_track: { label: 'On Track',          emoji: '🟢', color: 'text-emerald-300 bg-emerald-900/20 border-emerald-700/40' },
-  concerns: { label: 'Needs Attention',   emoji: '🟡', color: 'text-amber-300 bg-amber-900/20 border-amber-700/40'       },
-  urgent:   { label: 'Urgent Follow-up',  emoji: '🔴', color: 'text-red-300 bg-red-900/20 border-red-700/40'             },
+  on_track: { label: 'On track',          tone: 'good' },
+  concerns: { label: 'Needs attention',   tone: 'warn' },
+  urgent:   { label: 'Urgent follow-up',  tone: 'bad'  },
 }
 
 const MEETING_LABELS = {
@@ -183,8 +183,8 @@ export default function CheckinDetailModal({ checkin, type, onClose }) {
 
           {/* Status badge */}
           {statusCfg && (
-            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-semibold ${statusCfg.color}`}>
-              <span className="text-lg">{statusCfg.emoji}</span> {statusCfg.label}
+            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold tone-badge-${statusCfg.tone}`}>
+              <span className={`tone-dot tone-dot-${statusCfg.tone}`}/> {statusCfg.label}
             </div>
           )}
 
@@ -225,22 +225,22 @@ export default function CheckinDetailModal({ checkin, type, onClose }) {
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {[
-                    { v:'',              label:'Keep original', cls:'border-navy-700/40 text-navy-500' },
-                    { v:'on_track',      label:'🟢 On Track',   cls:'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' },
-                    { v:'some_concerns', label:'🟡 Concerns',   cls:'border-amber-500/40 bg-amber-500/10 text-amber-300' },
-                    { v:'struggling',    label:'🔴 Struggling', cls:'border-red-500/40 bg-red-500/10 text-red-300' },
+                    { v:'',              label:'Keep original', tone:null   },
+                    { v:'on_track',      label:'On track',      tone:'good' },
+                    { v:'some_concerns', label:'Concerns',      tone:'warn' },
+                    { v:'struggling',    label:'Struggling',    tone:'bad'  },
                   ].map(opt => (
                     <button key={opt.v} onClick={() => setOverrideStatus(opt.v)}
-                      className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium transition-all ${
-                        overrideStatus === opt.v ? opt.cls : 'border-navy-700/40 text-navy-600 hover:border-navy-600/60'
+                      className={`px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all btn-secondary ${
+                        overrideStatus === opt.v && opt.tone ? `tone-badge-${opt.tone}` : ''
                       }`}>
                       {opt.label}
                     </button>
                   ))}
                 </div>
                 {overrideStatus && overrideStatus !== checkin.overall_status && (
-                  <p className="text-xs text-navy-500 mt-1">
-                    Original: {checkin.overall_status === 'on_track' ? '🟢' : checkin.overall_status === 'some_concerns' ? '🟡' : '🔴'} — will be overridden in the dashboard
+                  <p className="text-xs mt-1" style={{color:'var(--ink-faint)'}}>
+                    Original: {STUDENT_STATUS[checkin.overall_status]?.label} — will be overridden in the dashboard
                   </p>
                 )}
               </div>
@@ -249,13 +249,13 @@ export default function CheckinDetailModal({ checkin, type, onClose }) {
             {/* Coordinator resolution status */}
             <div className="flex gap-2">
               {[
-                { v:'new',         label:'New',         color:'bg-blue-500/15 border-blue-500/40 text-blue-300' },
-                { v:'in_progress', label:'In Progress',  color:'bg-amber-500/15 border-amber-500/40 text-amber-300' },
-                { v:'resolved',    label:'Resolved',     color:'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' },
+                { v:'new',         label:'New',         tone:'info' },
+                { v:'in_progress', label:'In progress', tone:'warn' },
+                { v:'resolved',    label:'Resolved',    tone:'good' },
               ].map(opt => (
                 <button key={opt.v} onClick={() => setCoordStatus(opt.v)}
-                  className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
-                    coordStatus === opt.v ? opt.color : 'border-navy-700/40 text-navy-500 hover:border-navy-600/60'
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all btn-secondary ${
+                    coordStatus === opt.v ? `tone-badge-${opt.tone}` : ''
                   }`}>
                   {opt.label}
                 </button>
@@ -279,9 +279,9 @@ export default function CheckinDetailModal({ checkin, type, onClose }) {
             </div>
 
             <button onClick={() => updateStatus(coordStatus)} disabled={savingStatus}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold border transition-all disabled:opacity-50 ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-50 ${
                 statusSaved
-                  ? 'bg-emerald-900/20 border-emerald-700/40 text-emerald-300'
+                  ? 'tone-badge-good'
                   : 'btn-primary'
               }`}>
               {savingStatus ? <Loader2 size={12} className="animate-spin"/> :
@@ -292,7 +292,7 @@ export default function CheckinDetailModal({ checkin, type, onClose }) {
 
           {/* Success message */}
           {sent && (
-            <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-900/20 border border-emerald-700/40 text-emerald-300 text-sm">
+            <div className="flex items-center gap-2 px-4 py-3 rounded-xl tone-badge-good text-sm">
               ✓ Email drafted and sent successfully.
             </div>
           )}
@@ -308,7 +308,7 @@ export default function CheckinDetailModal({ checkin, type, onClose }) {
                   <X size={13}/>
                 </button>
               </div>
-              <p className="text-xs text-amber-400/80">
+              <p className="text-xs tone-text-warn">
                 ⚠ Review and edit this email carefully before sending. It does not quote the check-in response directly.
               </p>
               <div>

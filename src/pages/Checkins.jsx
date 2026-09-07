@@ -13,21 +13,21 @@ import { sendStudentEmail, sendSupervisorEmail } from '../lib/emailService'
 import { formatDistanceToNow } from 'date-fns'
 
 const STUDENT_STATUS = {
-  on_track:      { label: 'On Track',       emoji: '🟢', color: 'bg-emerald-900/30 border-emerald-700/40 text-emerald-300' },
-  some_concerns: { label: 'Some Concerns',  emoji: '🟡', color: 'bg-amber-900/30 border-amber-700/40 text-amber-300'     },
-  struggling:    { label: 'Struggling',     emoji: '🔴', color: 'bg-red-900/30 border-red-700/40 text-red-300'           },
+  on_track:      { label: 'On track',       tone: 'good' },
+  some_concerns: { label: 'Some concerns',  tone: 'warn' },
+  struggling:    { label: 'Struggling',     tone: 'bad'  },
 }
 
 const COORD_STATUS = {
-  new:         { label:'New',         dot:'bg-blue-400',    badge:'bg-blue-500/15 border-blue-500/40 text-blue-300'       },
-  in_progress: { label:'In Progress', dot:'bg-amber-400',   badge:'bg-amber-500/15 border-amber-500/40 text-amber-300'    },
-  resolved:    { label:'Resolved',    dot:'bg-emerald-400', badge:'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' },
+  new:         { label:'New',         tone: 'info' },
+  in_progress: { label:'In progress', tone: 'warn' },
+  resolved:    { label:'Resolved',    tone: 'good' },
 }
 
 const SUPERVISOR_STATUS = {
-  on_track: { label: 'On Track',         emoji: '🟢', color: 'bg-emerald-900/30 border-emerald-700/40 text-emerald-300' },
-  concerns: { label: 'Needs Attention',  emoji: '🟡', color: 'bg-amber-900/30 border-amber-700/40 text-amber-300'       },
-  urgent:   { label: 'Urgent Follow-up', emoji: '🔴', color: 'bg-red-900/30 border-red-700/40 text-red-300'             },
+  on_track: { label: 'On track',         tone: 'good' },
+  concerns: { label: 'Needs attention',  tone: 'warn' },
+  urgent:   { label: 'Urgent follow-up', tone: 'bad'  },
 }
 
 const MEETING_LABELS = {
@@ -152,9 +152,9 @@ export default function Checkins() {
   function SendBtn({ status, onSend, label = 'Send' }) {
     return (
       <button onClick={onSend} disabled={status==='sending'}
-        className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
-          status==='sent'    ? 'bg-emerald-900/20 border-emerald-700/40 text-emerald-300' :
-          status==='error'   ? 'bg-red-900/20 border-red-700/40 text-red-300' :
+        className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+          status==='sent'    ? 'tone-badge-good' :
+          status==='error'   ? 'tone-badge-bad' :
           status==='sending' ? 'btn-secondary opacity-70' : 'btn-secondary'
         }`}>
         {status==='sending' && <Loader2 size={11} className="animate-spin" />}
@@ -192,16 +192,16 @@ export default function Checkins() {
       {/* Stats row */}
       <div className="grid grid-cols-6 gap-3">
         {[
-          { label: '🟢 Students OK',    value: stuOnTrack,  color: 'text-emerald-300' },
-          { label: '🟡 Some Concerns',  value: stuConcerns, color: 'text-amber-300'   },
-          { label: '🔴 Struggling',     value: stuStruggle, color: 'text-red-300'     },
-          { label: '🟢 Supervisors OK', value: supOnTrack,  color: 'text-emerald-300' },
-          { label: '🟡 Sup Concerns',   value: supConcerns, color: 'text-amber-300'   },
-          { label: '🔴 Sup Urgent',     value: supUrgent,   color: 'text-red-300'     },
+          { label: 'Students OK',    value: stuOnTrack,  tone: 'good' },
+          { label: 'Some concerns',  value: stuConcerns, tone: 'warn' },
+          { label: 'Struggling',     value: stuStruggle, tone: 'bad'  },
+          { label: 'Supervisors OK', value: supOnTrack,  tone: 'good' },
+          { label: 'Sup. concerns',  value: supConcerns, tone: 'warn' },
+          { label: 'Sup. urgent',    value: supUrgent,   tone: 'bad'  },
         ].map(s => (
           <div key={s.label} className="card p-4">
-            <p className="text-xs text-navy-400 mb-1 leading-tight">{s.label}</p>
-            <p className={`text-2xl font-display font-semibold ${s.color}`}>{s.value}</p>
+            <p className="text-xs mb-1 leading-tight" style={{color:'var(--ink-faint)'}}>{s.label}</p>
+            <p className={`text-2xl font-display font-semibold tone-text-${s.tone}`}>{s.value}</p>
           </div>
         ))}
       </div>
@@ -255,8 +255,8 @@ export default function Checkins() {
             </button>
           ))}
           {statusFilter === 'active' && stuCheckins.filter(c=>c.coordinator_status==='new'&&c.overall_status==='struggling').length > 0 && (
-            <span className="flex items-center gap-1.5 text-xs text-red-300 bg-red-900/20 border border-red-700/40 px-3 py-1.5 rounded-xl ml-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse inline-block"/>
+            <span className="flex items-center gap-1.5 text-xs tone-badge-bad px-3 py-1.5 rounded-xl ml-2">
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse inline-block" style={{background:'var(--status-bad-fg)'}}/>
               {stuCheckins.filter(c=>c.coordinator_status==='new'&&c.overall_status==='struggling').length} struggling — not yet reviewed
             </span>
           )}
@@ -282,30 +282,30 @@ export default function Checkins() {
                   return (
                     <div key={c.id}
                       onClick={() => { setSelectedCheckin(c); setCheckinType('student') }}
-                      className={`p-3 rounded-xl border cursor-pointer hover:opacity-90 transition-opacity ${cfg.color}`}>
+                      className={`card tone-border-${cfg.tone} p-3 cursor-pointer hover:opacity-95 transition-opacity`}>
                       <div className="flex items-start justify-between gap-2 mb-1">
                         <div>
-                          <p className="text-sm font-semibold">{c.students?.name}</p>
-                          <p className="text-xs opacity-70 font-mono">{c.students?.student_id}</p>
+                          <p className="text-sm font-semibold" style={{color:'var(--ink)'}}>{c.students?.name}</p>
+                          <p className="text-xs font-mono" style={{color:'var(--ink-faint)'}}>{c.students?.student_id}</p>
                         </div>
-                        <span className="text-lg shrink-0">{cfg.emoji}</span>
+                        <span className={`tone-dot tone-dot-${cfg.tone} mt-1.5`}/>
                       </div>
-                      <p className="text-xs opacity-80">{MEETING_LABELS[c.supervisor_meetings] || ''}</p>
-                      <p className="text-xs opacity-80">{WRITING_LABELS[c.writing_status] || ''}</p>
+                      <p className="text-xs" style={{color:'var(--ink-dim)'}}>{MEETING_LABELS[c.supervisor_meetings] || ''}</p>
+                      <p className="text-xs" style={{color:'var(--ink-dim)'}}>{WRITING_LABELS[c.writing_status] || ''}</p>
                       {c.override_status && c.override_status !== c.overall_status && (
-                        <p className="text-xs opacity-50 mt-1 line-through">{STUDENT_STATUS[c.overall_status]?.label} (original)</p>
+                        <p className="text-xs mt-1 line-through" style={{color:'var(--ink-faint)'}}>{STUDENT_STATUS[c.overall_status]?.label} (original)</p>
                       )}
-                      {c.challenges && <p className="text-xs opacity-70 mt-1 line-clamp-1">⚠ {c.challenges}</p>}
-                      {c.support_needed && <p className="text-xs opacity-70 mt-0.5 line-clamp-1">→ {c.support_needed}</p>}
+                      {c.challenges && <p className="text-xs mt-1 line-clamp-1" style={{color:'var(--ink-dim)'}}>⚠ {c.challenges}</p>}
+                      {c.support_needed && <p className="text-xs mt-0.5 line-clamp-1" style={{color:'var(--ink-dim)'}}>→ {c.support_needed}</p>}
                       <div className="flex items-center justify-between mt-1.5">
-                        <p className="text-xs opacity-50">{formatDistanceToNow(new Date(c.submitted_at), {addSuffix:true})}</p>
+                        <p className="text-xs" style={{color:'var(--ink-faint)'}}>{formatDistanceToNow(new Date(c.submitted_at), {addSuffix:true})}</p>
                         {c.coordinator_status && c.coordinator_status !== 'new' && (
-                          <span className={`text-xs px-1.5 py-0.5 rounded-lg border font-medium ${COORD_STATUS[c.coordinator_status]?.badge}`}>
+                          <span className={`text-xs px-1.5 py-0.5 rounded-lg font-medium tone-badge-${COORD_STATUS[c.coordinator_status]?.tone}`}>
                             {COORD_STATUS[c.coordinator_status]?.label}
                           </span>
                         )}
                       </div>
-                      <p className="text-xs opacity-40 mt-1">Click to read full response →</p>
+                      <p className="text-xs mt-1" style={{color:'var(--ink-faint)'}}>Click to read full response →</p>
                     </div>
                   )
                 })}
@@ -331,29 +331,29 @@ export default function Checkins() {
                   return (
                     <div key={c.id}
                       onClick={() => { setSelectedCheckin(c); setCheckinType('supervisor') }}
-                      className={`p-3 rounded-xl border cursor-pointer hover:opacity-90 transition-opacity ${cfg.color}`}>
+                      className={`card tone-border-${cfg.tone} p-3 cursor-pointer hover:opacity-95 transition-opacity`}>
                       <div className="flex items-start justify-between gap-2 mb-1">
                         <div>
-                          <p className="text-sm font-semibold">{c.students?.name}</p>
-                          <p className="text-xs opacity-70 font-mono">{c.students?.student_id}</p>
+                          <p className="text-sm font-semibold" style={{color:'var(--ink)'}}>{c.students?.name}</p>
+                          <p className="text-xs font-mono" style={{color:'var(--ink-faint)'}}>{c.students?.student_id}</p>
                         </div>
-                        <span className="text-lg shrink-0">{cfg.emoji}</span>
+                        <span className={`tone-dot tone-dot-${cfg.tone} mt-1.5`}/>
                       </div>
-                      <p className="text-xs opacity-80 font-medium">{cfg.label}</p>
-                      {c.issue_type && <p className="text-xs opacity-70 mt-1">⚠ {c.issue_type}</p>}
-                      {c.issue_description && <p className="text-xs opacity-70 mt-0.5 line-clamp-2">{c.issue_description}</p>}
+                      <p className={`text-xs font-medium tone-text-${cfg.tone}`}>{cfg.label}</p>
+                      {c.issue_type && <p className="text-xs mt-1" style={{color:'var(--ink-dim)'}}>⚠ {c.issue_type}</p>}
+                      {c.issue_description && <p className="text-xs mt-0.5 line-clamp-2" style={{color:'var(--ink-dim)'}}>{c.issue_description}</p>}
                       {c.recommended_action && c.recommended_action !== 'No action needed' && (
-                        <p className="text-xs font-medium mt-1 opacity-90">→ {c.recommended_action}</p>
+                        <p className="text-xs font-medium mt-1" style={{color:'var(--ink)'}}>→ {c.recommended_action}</p>
                       )}
                       <div className="flex items-center justify-between mt-1.5">
-                        <p className="text-xs opacity-50">{c.supervisors?.name} · {formatDistanceToNow(new Date(c.submitted_at), {addSuffix:true})}</p>
+                        <p className="text-xs" style={{color:'var(--ink-faint)'}}>{c.supervisors?.name} · {formatDistanceToNow(new Date(c.submitted_at), {addSuffix:true})}</p>
                         {c.coordinator_status && c.coordinator_status !== 'new' && (
-                          <span className={`text-xs px-1.5 py-0.5 rounded-lg border font-medium ${COORD_STATUS[c.coordinator_status]?.badge}`}>
+                          <span className={`text-xs px-1.5 py-0.5 rounded-lg font-medium tone-badge-${COORD_STATUS[c.coordinator_status]?.tone}`}>
                             {COORD_STATUS[c.coordinator_status]?.label}
                           </span>
                         )}
                       </div>
-                      <p className="text-xs opacity-40 mt-1">Click to read full response →</p>
+                      <p className="text-xs mt-1" style={{color:'var(--ink-faint)'}}>Click to read full response →</p>
                     </div>
                   )
                 })}
@@ -383,12 +383,12 @@ export default function Checkins() {
                     <p className="text-xs text-navy-400 font-mono">{student.student_id}</p>
                   </div>
                   {cfg && (
-                    <span className={`text-xs px-2 py-1 rounded-lg border shrink-0 ${cfg.color}`}>
-                      {cfg.emoji} {cfg.label}
+                    <span className={`text-xs px-2 py-1 rounded-lg shrink-0 tone-badge-${cfg.tone}`}>
+                      {cfg.label}
                     </span>
                   )}
                   {latest && (
-                    <p className="text-xs text-navy-500 shrink-0">
+                    <p className="text-xs shrink-0" style={{color:'var(--ink-faint)'}}>
                       {formatDistanceToNow(new Date(latest.submitted_at), {addSuffix:true})}
                     </p>
                   )}
@@ -422,12 +422,12 @@ export default function Checkins() {
                     </div>
                   </div>
                   {cfg && (
-                    <span className={`text-xs px-2 py-1 rounded-lg border shrink-0 ${cfg.color}`}>
-                      {cfg.emoji} {cfg.label}
+                    <span className={`text-xs px-2 py-1 rounded-lg shrink-0 tone-badge-${cfg.tone}`}>
+                      {cfg.label}
                     </span>
                   )}
                   {latest && (
-                    <p className="text-xs text-navy-500 shrink-0">
+                    <p className="text-xs shrink-0" style={{color:'var(--ink-faint)'}}>
                       {formatDistanceToNow(new Date(latest.submitted_at), {addSuffix:true})}
                     </p>
                   )}
