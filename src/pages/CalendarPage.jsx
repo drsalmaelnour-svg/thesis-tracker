@@ -9,7 +9,7 @@ import {
   getStudentsWithProgress, getCalendarEvents,
   upsertCalendarEvent, deleteCalendarEvent, MILESTONES
 } from '../lib/supabase'
-import { sendStudentEmail } from '../lib/emailService'
+import SendCalendarModal from '../components/SendCalendarModal'
 
 // Solid pastel backgrounds (not translucent) so black text stays readable
 const EVENT_COLORS = [
@@ -48,8 +48,7 @@ export default function CalendarPage() {
   const [loading, setLoading]         = useState(true)
   const [editing, setEditing]         = useState(null) // event being edited
   const [saving, setSaving]           = useState(false)
-  const [sending, setSending]         = useState(false)
-  const [sendResult, setSendResult]   = useState(null)
+  const [showSendModal, setShowSendModal] = useState(false)
   const fileRef = useRef()
 
   useEffect(() => {
@@ -83,28 +82,7 @@ export default function CalendarPage() {
     setEvents(await getCalendarEvents(activeCohort))
   }
 
-  async function sendCalendarToStudents() {
-    setSending(true); setSendResult(null)
-    const cohortStudents = students.filter(s=>s.enrollment_year===activeCohort)
-    const sorted = [...events].sort((a,b)=>new Date(a.event_date)-new Date(b.event_date))
-    const calendarText = sorted.map(e =>
-      `📅 ${new Date(e.event_date).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})} — ${e.title}${e.description?`\n   ${e.description}`:''}`
-    ).join('\n\n')
-
-    let sent = 0
-    for (const student of cohortStudents) {
-      await sendStudentEmail({
-        student,
-        milestoneId: null,
-        subject: `${activeCohort} Cohort — Thesis Academic Calendar`,
-        message: `Please find below your thesis program calendar for the ${activeCohort} cohort.\n\n${calendarText}\n\nPlease note these dates in your personal calendar and ensure you are on track with each milestone.\n\nFor any questions, please do not hesitate to contact the thesis coordination office.`,
-      })
-      sent++
-      await new Promise(r=>setTimeout(r,350))
-    }
-    setSendResult(`Calendar sent to ${sent} student${sent!==1?'s':''} in the ${activeCohort} cohort.`)
-    setSending(false)
-  }
+  const cohortStudents = students.filter(s=>s.enrollment_year===activeCohort)
 
   // Parse uploaded CSV
   async function handleFileUpload(file) {
@@ -169,10 +147,9 @@ export default function CalendarPage() {
           </button>
           <input ref={fileRef} type="file" accept=".csv" className="hidden"
             onChange={e=>handleFileUpload(e.target.files[0])}/>
-          <button onClick={sendCalendarToStudents} disabled={sending||!events.length}
+          <button onClick={()=>setShowSendModal(true)} disabled={!events.length}
             className="btn-primary disabled:opacity-50">
-            {sending?<Loader2 size={14} className="animate-spin"/>:<Send size={14}/>}
-            {sending?'Sending…':'Send to Students'}
+            <Send size={14}/> Send Calendar
           </button>
         </div>
       </div>
@@ -191,12 +168,6 @@ export default function CalendarPage() {
           </button>
         ))}
       </div>
-
-      {sendResult && (
-        <div className="p-3 rounded-xl tone-badge-good text-sm">
-          ✓ {sendResult}
-        </div>
-      )}
 
       <div className="grid grid-cols-3 gap-6">
 
@@ -352,6 +323,15 @@ export default function CalendarPage() {
           )}
         </div>
       </div>
+
+      {showSendModal && (
+        <SendCalendarModal
+          events={events}
+          students={cohortStudents}
+          cohortYear={activeCohort}
+          onClose={()=>setShowSendModal(false)}
+        />
+      )}
     </div>
   )
 }
